@@ -109,6 +109,34 @@ function makeSnapshot() {
         ],
         { waterway: 'river' },
       ),
+      way(
+        35,
+        'Grand Union Canal (Paddington Branch)',
+        [3, 36],
+        [
+          [0.003, 0],
+          [0.0035, 0.0005],
+        ],
+      ),
+      way(
+        37,
+        'Grand Union Canal',
+        [3, 38],
+        [
+          [0.003, 0],
+          [0.004, -0.0001],
+        ],
+      ),
+      way(
+        39,
+        'Downstream Grand Union lock',
+        [38, 40],
+        [
+          [0.004, -0.0001],
+          [0.0045, -0.0002],
+        ],
+        { lock: 'yes' },
+      ),
       node(2, 0.001, 0, { waterway: 'lock_gate' }),
       node(8, 0.002, 0, { waterway: 'turning_point', name: 'Winding Hole' }),
       node(9, 0.002, 0.002, { waterway: 'turning_point', name: 'Off-line winding' }),
@@ -125,11 +153,12 @@ test('haversine length is positive and plausible for one longitude degree at the
 test('buildGraph splits route ways at typed vertices and detects bridges', () => {
   const { graph, summary } = buildGraph(makeSnapshot())
 
-  assert.equal(summary.rawWaterwayWays, 7)
-  assert.equal(summary.includedWaterwayWays, 4)
-  assert.equal(summary.excludedWaterwayWays, 3)
+  assert.equal(summary.rawWaterwayWays, 10)
+  assert.equal(summary.includedWaterwayWays, 5)
+  assert.equal(summary.excludedWaterwayWays, 5)
   assert.equal(summary.offLineWindingCount, 1)
   assert.equal(summary.bridgeCount, 1)
+  assert.equal(summary.componentCount, 1)
   assert.equal(graph.offLineWindings[0].name, 'Off-line winding')
   assert.equal(summary.connected, true)
   assert.equal(graph.anchors.start.feature, 'Packet Boat Marina')
@@ -137,6 +166,9 @@ test('buildGraph splits route ways at typed vertices and detects bridges', () =>
   assert.ok(graph.nodes.some((node) => node.id === 2 && node.type === 'lock'))
   assert.ok(graph.nodes.some((node) => node.id === 8 && node.type === 'winding'))
   assert.ok(graph.nodes.some((node) => node.id === 3 && node.type === 'junction'))
+  assert.ok(!graph.nodes.some((node) => node.id === 38))
+  assert.ok(!graph.edges.some((edge) => edge.way === 37))
+  assert.ok(!graph.edges.some((edge) => edge.way === 39))
   assert.ok(graph.edges.some((edge) => edge.lock))
 
   const crossedEdge = graph.edges.find((edge) => edge.bridges.length > 0)
@@ -159,7 +191,7 @@ test('buildGraph reports disconnected endpoint networks', () => {
     {
       type: 'way',
       id: 14,
-      nodes: [40, 41],
+      nodes: [50, 51],
       geometry: [
         { lon: 0.02, lat: 0 },
         { lon: 0.021, lat: 0 },
@@ -171,4 +203,5 @@ test('buildGraph reports disconnected endpoint networks', () => {
   const { graph, summary } = buildGraph(raw)
   assert.equal(summary.connected, false)
   assert.equal(graph.connected, false)
+  assert.equal(summary.componentCount, 2)
 })

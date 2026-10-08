@@ -33,8 +33,15 @@ features, bridge ways, and the named start and finish landmarks. Set
 the route in `SCOPE.md`, splits them into typed nodes and edges, measures edge
 lengths, and adds bridge crossings. It writes `data/graph/graph.json` and prints
 `CONNECTED` when Packet Boat Marina and Pickett's Lock snap to the same graph
-component. If not, it reports missing anchors or the closest vertices across
-the gap.
+component. At Bulls Bridge, it removes the Grand Union continuation beyond the
+Paddington junction only when that edge is not needed to connect the endpoints.
+It also reports the number of graph components; more than one means there are
+disconnected mapped sections to inspect. If the endpoint check fails, it reports
+missing anchors or the closest vertices across the gap.
+
+The map displays the generated graph, with toggles for graph nodes, bridge
+crossings, and the region boundary. Use “Show full route” to fit the canal
+network in view, and click a graph feature to inspect its OSM details.
 
 Raw OSM data is made available under the Open Database License (ODbL); the
 snapshot includes the attribution returned by OpenStreetMap.

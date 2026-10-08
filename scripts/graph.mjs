@@ -28,6 +28,7 @@ async function main() {
   console.log(`In-scope canal/lock ways: ${summary.includedWaterwayWays}`)
   console.log(`Excluded waterway ways: ${summary.excludedWaterwayWays}`)
   console.log(`Graph edges: ${summary.edgeCount}`)
+  console.log(`Connected components: ${summary.componentCount}`)
   console.log(
     `Nodes: ${Object.entries(summary.nodesByType)
       .map(([type, count]) => `${type} ${count}`)
@@ -39,7 +40,10 @@ async function main() {
   console.log(`Pickett's Lock: ${formatAnchor(summary.finish)}`)
 
   if (summary.connected) {
-    console.log('CONNECTED')
+    console.log(
+      summary.componentCount === 1 ? 'CONNECTED' : 'ENDPOINTS CONNECTED; CHECK COMPONENTS',
+    )
+    if (summary.componentCount !== 1) process.exitCode = 1
     return
   }
 

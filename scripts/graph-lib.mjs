@@ -145,6 +145,34 @@ function reachableFrom(edges, startId) {
   return seen
 }
 
+function countComponents(edges) {
+  const adjacency = new Map()
+  for (const edge of edges) {
+    if (!adjacency.has(edge.a)) adjacency.set(edge.a, [])
+    if (!adjacency.has(edge.b)) adjacency.set(edge.b, [])
+    adjacency.get(edge.a).push(edge.b)
+    adjacency.get(edge.b).push(edge.a)
+  }
+
+  const seen = new Set()
+  let components = 0
+  for (const id of adjacency.keys()) {
+    if (seen.has(id)) continue
+    components += 1
+    const queue = [id]
+    seen.add(id)
+    for (let index = 0; index < queue.length; index += 1) {
+      for (const next of adjacency.get(queue[index]) ?? []) {
+        if (!seen.has(next)) {
+          seen.add(next)
+          queue.push(next)
+        }
+      }
+    }
+  }
+  return components
+}
+
 export function buildGraph(raw) {
   if (!Array.isArray(raw.elements)) {
     throw new Error('OSM snapshot must contain an elements array')
@@ -235,11 +263,13 @@ export function buildGraph(raw) {
           lon: point.position[0],
           lat: point.position[1],
           name: tags.name ?? way.tags?.name,
-          lock: false,
+          lockGate: false,
+          lockChamber: false,
           winding: false,
           shared: false,
         }
-        meta.lock ||= isLockGate || (isLockChamber && isEndpoint)
+        meta.lockGate ||= isLockGate
+        meta.lockChamber ||= isLockChamber && isEndpoint
         meta.winding ||= isWinding
         meta.shared ||= isShared
         meta.name ||= tags.name ?? way.tags?.name
@@ -273,16 +303,85 @@ export function buildGraph(raw) {
     }
   }
 
+  const paddingtonWayNames = /^grand union canal \(paddington (?:branch|arm)\)$/i
+  const mainCanalName = /^grand union canal$/i
+  const wayById = new Map(ways.map((way) => [String(way.id), way]))
+  const bullsBridgeNodeIds = new Set()
+  for (const way of ways.filter((candidate) =>
+    paddingtonWayNames.test(candidate.tags?.name ?? ''),
+  )) {
+    for (const point of wayPoints.get(way.id) ?? []) {
+      const sharedWays = [...(wayOccurrences.get(String(point.id)) ?? [])]
+      if (
+        sharedWays.some((id) =>
+          mainCanalName.test(wayById.get(String(id))?.tags?.name ?? ''),
+        )
+      ) {
+        bullsBridgeNodeIds.add(point.id)
+      }
+    }
+  }
+
+  const anchors = collectAnchors(elements)
+  const provisionalNodes = [...vertexMeta.values()]
+  const start = findAnchor(/packet boat marina/i, anchors, provisionalNodes)
+  const finish = findAnchor(/pickett.?s lock|alfie.?s lock/i, anchors, provisionalNodes)
+  let routeEdges = [...edges]
+
+  // At Bulls Bridge, keep the Grand Union continuation needed to connect both endpoints.
+  for (const bullsNodeId of bullsBridgeNodeIds) {
+    const junctionEdges = routeEdges.filter(
+      (edge) =>
+        mainCanalName.test(edge.name ?? '') &&
+        (String(edge.a) === String(bullsNodeId) ||
+          String(edge.b) === String(bullsNodeId)),
+    )
+
+    for (const edge of junctionEdges) {
+      const candidateEdges = routeEdges.filter(
+        (candidate) => candidate.id !== edge.id,
+      )
+      const startComponent = start
+        ? reachableFrom(candidateEdges, start.vertexId)
+        : new Set()
+      if (!finish || !startComponent.has(finish.vertexId)) continue
+
+      routeEdges = candidateEdges
+      const oppositeEnd =
+        String(edge.a) === String(bullsNodeId) ? edge.b : edge.a
+      if (!startComponent.has(oppositeEnd)) {
+        const outsideBranch = reachableFrom(routeEdges, oppositeEnd)
+        if (!outsideBranch.has(bullsNodeId)) {
+          routeEdges = routeEdges.filter(
+            (candidate) =>
+              !outsideBranch.has(candidate.a) &&
+              !outsideBranch.has(candidate.b),
+          )
+        }
+      }
+    }
+  }
+
   const degree = new Map()
-  for (const edge of edges) {
+  for (const edge of routeEdges) {
     degree.set(edge.a, (degree.get(edge.a) ?? 0) + 1)
     degree.set(edge.b, (degree.get(edge.b) ?? 0) + 1)
   }
+  const retainedLockNodeIds = new Set(
+    routeEdges
+      .filter((edge) => edge.lock)
+      .flatMap((edge) => [String(edge.a), String(edge.b)]),
+  )
 
-  const nodes = [...vertexMeta.values()].map((node) => {
+  const nodes = [...vertexMeta.values()]
+    .filter((node) => degree.has(node.id))
+    .map((node) => {
     const count = degree.get(node.id) ?? 0
+    const isLock =
+      node.lockGate ||
+      (node.lockChamber && retainedLockNodeIds.has(String(node.id)))
     let type = 'join'
-    if (node.lock) type = 'lock'
+    if (isLock) type = 'lock'
     else if (node.winding) type = 'winding'
     else if (count >= 3) type = 'junction'
     else if (count <= 1) type = 'end'
@@ -309,15 +408,12 @@ export function buildGraph(raw) {
     }))
     .filter((way) => way.coords.length >= 2)
 
-  for (const edge of edges) {
+  for (const edge of routeEdges) {
     edge.bridges = getBridges(edge, bridgeWays)
   }
 
-  const anchors = collectAnchors(elements)
-  const start = findAnchor(/packet boat marina/i, anchors, nodes)
-  const finish = findAnchor(/pickett.?s lock|alfie.?s lock/i, anchors, nodes)
   const routeNodeIdsForGraph = new Set(
-    ways.flatMap((way) => (way.nodes ?? []).map(String)),
+    routeEdges.flatMap((edge) => [String(edge.a), String(edge.b)]),
   )
   const offLineWindings = elements
     .filter(
@@ -333,15 +429,16 @@ export function buildGraph(raw) {
       ...(node.tags?.name ? { name: node.tags.name } : {}),
     }))
   const startComponent = start
-    ? reachableFrom(edges, start.vertexId)
+    ? reachableFrom(routeEdges, start.vertexId)
     : new Set()
   const connected =
     start !== null &&
     finish !== null &&
     startComponent.has(finish.vertexId)
+  const componentCount = countComponents(routeEdges)
   let gap = null
   if (start && finish && !connected) {
-    const finishComponent = reachableFrom(edges, finish.vertexId)
+    const finishComponent = reachableFrom(routeEdges, finish.vertexId)
     let closestDistanceM = Infinity
     for (const fromId of startComponent) {
       const fromNode = nodes.find((node) => node.id === fromId)
@@ -364,24 +461,32 @@ export function buildGraph(raw) {
   return {
     graph: {
       nodes,
-      edges,
+      edges: routeEdges,
       anchors: { start, finish },
       connected,
+      componentCount,
       gap,
       offLineWindings,
     },
     summary: {
       rawWaterwayWays: allWaterways.length,
-      includedWaterwayWays: ways.length,
-      excludedWaterwayWays: allWaterways.length - ways.length,
+      includedWaterwayWays: new Set(routeEdges.map((edge) => String(edge.way)))
+        .size,
+      excludedWaterwayWays:
+        allWaterways.length -
+        new Set(routeEdges.map((edge) => String(edge.way))).size,
       nodesByType: Object.fromEntries(
         ['lock', 'junction', 'winding', 'end', 'join'].map((type) => [
           type,
           nodes.filter((node) => node.type === type).length,
         ]),
       ),
-      edgeCount: edges.length,
-      bridgeCount: edges.reduce((count, edge) => count + edge.bridges.length, 0),
+      edgeCount: routeEdges.length,
+      componentCount,
+      bridgeCount: routeEdges.reduce(
+        (count, edge) => count + edge.bridges.length,
+        0,
+      ),
       offLineWindingCount: offLineWindings.length,
       start,
       finish,
