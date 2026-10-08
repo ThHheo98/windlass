@@ -1,32 +1,47 @@
-# React + TypeScript + Vite
+# Windlass
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Windlass is a map and canal-routing project for the London waterways listed in
+[`SCOPE.md`](./SCOPE.md).
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20.19+ or 22.12+
+- npm
 
-## React Compiler
+## Run the map
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Build the OpenStreetMap graph
+
+Fetch the OSM snapshot for the region polygon, then build and check the graph:
+
+```sh
+npm run osm:fetch
+npm run graph
+```
+
+`osm:fetch` reads `data/region/london-mvp.geojson` and writes the full Overpass
+response to `data/osm/raw.json`. It includes waterway ways, lock and winding
+features, bridge ways, and the named start and finish landmarks. Set
+`OVERPASS_URL` to use a specific Overpass API endpoint.
+
+`graph` reads that snapshot, keeps named canal and Lee waterway ways that match
+the route in `SCOPE.md`, splits them into typed nodes and edges, measures edge
+lengths, and adds bridge crossings. It writes `data/graph/graph.json` and prints
+`CONNECTED` when Packet Boat Marina and Pickett's Lock snap to the same graph
+component. If not, it reports missing anchors or the closest vertices across
+the gap.
+
+Raw OSM data is made available under the Open Database License (ODbL); the
+snapshot includes the attribution returned by OpenStreetMap.
+
+## Validate the graph code
+
+```sh
+npm test
+npm run lint
+```
