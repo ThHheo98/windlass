@@ -202,6 +202,67 @@ For example, Packet Boat Marina to Pickett's Lock is 51.1 km with 14 locks. That
 takes about 8 h of cruising, so roughly 15 h in total at `slow`, 12 h 40 m at
 `medium` and 10 h 20 m at `fast`.
 
+## Show my position
+
+Press **Show my position** to put a blue dot on the canal where you are. The
+browser asks for location permission the first time. Your position stays on
+your device and isn't stored or sent anywhere.
+
+- The dot is snapped onto the canal. A faint circle around it shows the raw GPS
+  fix and its reported accuracy.
+- The map follows you until you pan it; **Re-centre on me** follows again.
+- With a route planned, the panel shows the time and distance left, the locks
+  left and the next lock. **Re-plan from here** (or **Start a route from here**)
+  plans from your position.
+- The status line says when it's finding you, when GPS is weak, when you're away
+  from the canal or route, and when location is blocked or unavailable.
+
+Location only works on a secure page: `https://`, or `localhost` while
+developing.
+
+### Tracking
+
+`scripts/track-lib.mjs` turns raw GPS fixes into the position shown:
+
+- **With a planned route**, each fix is matched to the route line, close to
+  where the boat was, so a fix can't match a far part of the route. Progress
+  along it never goes backwards.
+- **Without a route**, each fix is snapped onto the canal network, preferring
+  the current canal and edges joined to it within 60 m along the canal.
+- **Smoothing:** an alpha–beta filter tracks position and speed, so GPS noise
+  doesn't make the dot jump about while a moving boat isn't left behind.
+- **Junctions and locks:** the dot only moves onto another branch when a fix is
+  clearly (8 m) nearer it, so one noisy fix near a side branch can't send it the
+  wrong way. When it runs off the end of a short edge, such as a lock chamber,
+  it carries on to the next one.
+- **Glitches:** a fix with accuracy worse than 100 m is ignored. A fix that would
+  need more than 15 km/h, or one on a canal not joined to the current one, is
+  held until 3 fixes in a row agree.
+
+### Simulated GPS
+
+Add `?simulate` to the URL to replay a boat instead of using the device's GPS:
+`?simulate` runs at 30× real time, `?simulate=60` at 60×. The boat travels the
+planned route, or Packet Boat Marina to Pickett's Lock if none is planned. It
+cruises at 6.4 km/h, waits the lock time at each lock, and has realistic GPS
+noise with an occasional glitch.
+
+The tests run the same simulation over the whole Packet Boat Marina to
+Pickett's Lock route, with and without a planned route, at every lock pace and
+across several random seeds. They check that the dot never moves more than
+30 m between 5-second fixes, never leaves the route, stays within 30 m of the
+boat, and arrives with every lock passed. In a wider sweep (20 seeds, 6 m of GPS
+noise) the largest step was 26 m. With poor GPS (10 m of noise) and no planned
+route, a few steps of up to about 39 m remain, mostly at Little Venice junction.
+
+## Deployment
+
+`.github/workflows/deploy.yml` builds the site and publishes it to GitHub Pages
+at **https://thhheo98.github.io/windlass/** on every push to `main`, after the
+tests and lint pass. GitHub Pages serves over HTTPS, which location needs.
+`vite.config.ts` sets the `/windlass/` base path for builds and
+`npm run preview`; the dev server stays at `/`.
+
 ## Validate the graph code
 
 ```sh
