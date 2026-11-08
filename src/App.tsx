@@ -472,8 +472,12 @@ function App() {
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
+            // OSM data is ODbL; CRT lock data is Open Government Licence v3.0.
             attribution:
-              '&copy; OpenStreetMap contributors · Lock data &copy; Canal &amp; River Trust',
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> (ODbL) · ' +
+              'Lock data &copy; Canal &amp; River Trust, &copy; Crown copyright and database rights, Ordnance Survey 100022432. ' +
+              'Contains public sector information licensed under the ' +
+              '<a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>',
           },
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }],

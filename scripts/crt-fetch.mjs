@@ -51,6 +51,8 @@ async function main() {
     source: 'Canal & River Trust open data: Canal_And_River_Trust_Locks_View',
     attribution:
       '© Canal & River Trust copyright and database rights reserved. © Crown copyright and database rights, Ordnance Survey 100022432.',
+    licence:
+      'Contains public sector information licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).',
     fetchedAt: new Date().toISOString(),
     features: data.features.map(({ type, geometry, properties }) => ({
       type,
