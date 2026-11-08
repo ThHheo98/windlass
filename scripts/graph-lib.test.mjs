@@ -205,3 +205,26 @@ test('buildGraph reports disconnected endpoint networks', () => {
   assert.equal(graph.connected, false)
   assert.equal(summary.componentCount, 2)
 })
+
+test('buildGraph keeps Uxbridge Lock and trims the main line beyond it', () => {
+  const raw = makeSnapshot()
+  const way = (id, name, nodes, coords, tags = {}) => ({
+    type: 'way',
+    id,
+    nodes,
+    geometry: coords.map(([lon, lat]) => ({ lon, lat })),
+    tags: { name, waterway: 'canal', ...tags },
+  })
+  raw.elements.push(
+    way(60, '88 Uxbridge Lock', [1, 61], [[0, 0], [-0.0005, 0]], { lock: 'yes' }),
+    way(62, 'Grand Union Canal', [61, 63], [[-0.0005, 0], [-0.002, 0]]),
+    way(64, '87 Denham Deep Lock', [63, 65], [[-0.002, 0], [-0.0025, 0]], { lock: 'yes' }),
+    way(66, 'Grand Union Canal', [65, 67], [[-0.0025, 0], [-0.004, 0]]),
+  )
+
+  const { graph, summary } = buildGraph(raw)
+  assert.ok(graph.edges.some((edge) => edge.way === 60))
+  assert.ok(!graph.edges.some((edge) => [62, 64, 66].includes(edge.way)))
+  assert.equal(graph.nodes.find((node) => node.id === 61)?.type, 'lock')
+  assert.equal(summary.connected, true)
+})
