@@ -40,6 +40,62 @@
   gap: 12px;
 }
 
+.map-panel-heading > div {
+  margin-right: auto;
+}
+
+.panel-toggle {
+  display: grid;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  margin-left: -4px;
+  padding: 0;
+  border: 1px solid #c6d5d9;
+  border-radius: 8px;
+  background: #f3f8f8;
+  color: #145b65;
+  cursor: pointer;
+}
+
+.panel-toggle svg {
+  transition: transform 0.15s ease;
+}
+
+.map-panel.is-collapsed .panel-toggle svg {
+  transform: rotate(180deg);
+}
+
+.panel-toggle:hover {
+  background: #e5f1f2;
+}
+
+.panel-toggle:focus-visible {
+  outline: 2px solid #087b84;
+  outline-offset: 2px;
+}
+
+.map-panel.is-collapsed {
+  padding-bottom: 12px;
+}
+
+.panel-collapsed p {
+  margin: 8px 0 0;
+  color: #263b45;
+  font-size: 12px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-collapsed p.is-problem {
+  color: #a13d2c;
+}
+
+.panel-body[hidden] {
+  display: none;
+}
+
 .eyebrow {
   margin: 0 0 2px;
   color: #58727e;
