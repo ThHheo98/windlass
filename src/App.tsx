@@ -121,6 +121,9 @@ function positionFeatures(state: PositionState) {
   return { type: 'FeatureCollection' as const, features }
 }
 
+/** Phone-width screens, where the panel would cover most of the map. */
+const isPhoneWidth = () => window.matchMedia('(max-width: 540px)').matches
+
 function describePosition(state: PositionState): { text: string; tone: 'ok' | 'wait' | 'problem' } | null {
   const accuracy = 'raw' in state ? Math.round(state.raw.accuracyM) : 0
   switch (state.status) {
@@ -392,6 +395,8 @@ function App() {
   const [showBoundary, setShowBoundary] = useState(true)
   const [showMarinas, setShowMarinas] = useState(true)
   const [mapReady, setMapReady] = useState(false)
+  // Phones start with the panel collapsed so the map is visible.
+  const [panelOpen, setPanelOpen] = useState(() => !isPhoneWidth())
   const [lockSpeed, setLockSpeed] = useState<LockSpeed>('medium')
   const [start, setStart] = useState<LonLat | null>(null)
   const [finish, setFinish] = useState<LonLat | null>(null)
@@ -713,8 +718,43 @@ function App() {
       // The popup is closed here rather than with closeOnClick, whose own click
       // listener would otherwise close a popup this handler has just reopened.
       const popup = new Popup({ closeButton: true, closeOnClick: false })
+
+      // On touch screens MapLibre cancels the browser's tap-to-click, so 'click'
+      // never fires and tapping the map would do nothing. Turn a quick, still,
+      // one-finger tap into a map click. Some browsers still send their own click
+      // afterwards; that one is ignored so a single tap can't count twice.
+      let tapStart: { x: number; y: number; time: number } | null = null
+      let ignoreNativeClicksUntil = 0
+      map.on('touchstart', (event) => {
+        tapStart =
+          event.points.length === 1
+            ? { x: event.point.x, y: event.point.y, time: performance.now() }
+            : null
+      })
+      map.on('touchmove', (event) => {
+        if (tapStart && Math.hypot(event.point.x - tapStart.x, event.point.y - tapStart.y) > 10) {
+          tapStart = null
+        }
+      })
+      map.on('touchend', (event) => {
+        const begun = tapStart
+        tapStart = null
+        if (!begun || event.originalEvent.touches.length > 0) return
+        const still = Math.hypot(event.point.x - begun.x, event.point.y - begun.y) <= 10
+        if (!still || performance.now() - begun.time > 500) return
+        ignoreNativeClicksUntil = performance.now() + 700
+        map.fire('click', {
+          point: event.point,
+          lngLat: event.lngLat,
+          originalEvent: event.originalEvent,
+        })
+      })
+      const isDuplicateClick = (event: { originalEvent?: Event }) =>
+        event.originalEvent instanceof MouseEvent && performance.now() < ignoreNativeClicksUntil
+
       const clickable = CLICKABLE_LAYERS.filter((layer) => map.getLayer(layer))
       map.on('click', (event) => {
+        if (isDuplicateClick(event)) return
         if (pickingRef.current) {
           popup.remove()
           return
@@ -748,6 +788,7 @@ function App() {
       // Registered after the layer handlers so they still see picking mode on the
       // click that sets the finish, and skip their popups.
       map.on('click', (event) => {
+        if (isDuplicateClick(event)) return
         const target = pickingRef.current
         if (!target) return
         const snapped = snapToNetwork(graph, [event.lngLat.lng, event.lngLat.lat])
@@ -774,8 +815,19 @@ function App() {
     map.on('error', (event) => console.error('MapLibre error:', event.error))
     map.addControl(new NavigationControl(), 'top-right')
 
+    // On narrow screens MapLibre shows the credits expanded until the map is
+    // dragged, which covers a lot of a phone's map. Show them for a few
+    // seconds, then fold them behind the (i) button, which still opens them.
+    const foldCredits = window.setTimeout(() => {
+      map
+        .getContainer()
+        .querySelector('.maplibregl-ctrl-attrib.maplibregl-compact-show')
+        ?.classList.remove('maplibregl-compact-show')
+    }, 5000)
+
     const markers = markersRef.current
     return () => {
+      window.clearTimeout(foldCredits)
       markers.start?.remove()
       markers.finish?.remove()
       markers.start = null
@@ -900,7 +952,10 @@ function App() {
     if (!myCoord) return
     setPickError(null)
     setStart(myCoord)
-    if (!finish) beginPicking('finish')
+    if (!finish) {
+      beginPicking('finish')
+      if (isPhoneWidth()) setPanelOpen(false)
+    }
   }
 
   const clearRoute = () => {
@@ -919,6 +974,8 @@ function App() {
     setStart(null)
     setFinish(null)
     beginPicking('start')
+    // On a phone, get the panel out of the way so you can tap the map.
+    if (isPhoneWidth()) setPanelOpen(false)
   }
 
   useEffect(() => {
@@ -947,7 +1004,11 @@ function App() {
         ref={mapContainer}
         aria-label="London canal graph map"
       />
-      <section className="map-panel" aria-label="Graph map controls" ref={panelRef}>
+      <section
+        className={`map-panel${panelOpen ? '' : ' is-collapsed'}`}
+        aria-label="Graph map controls"
+        ref={panelRef}
+      >
         <div className="map-panel-heading">
           <div>
             <p className="eyebrow">Windlass v1.0</p>
@@ -960,212 +1021,269 @@ function App() {
               ? 'Connected'
               : `${graph.componentCount} components`}
           </span>
+          <button
+            aria-controls="panel-body"
+            aria-expanded={panelOpen}
+            aria-label={panelOpen ? 'Collapse panel' : 'Expand panel'}
+            className="panel-toggle"
+            onClick={() => setPanelOpen((open) => !open)}
+            type="button"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
+              <path
+                d="M5 8l5 5 5-5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
+          </button>
         </div>
-        <p className="map-summary">
-          {graph.edges.length} canal sections · {graph.nodes.length} graph nodes
-        </p>
-        <section className="route-planner" aria-label="Route planner">
-          <div className="route-planner-heading">
-            <h2>Plan a route</h2>
-            {(start || finish) && (
-              <button className="text-button" onClick={clearRoute} type="button">
-                Clear
-              </button>
+        {!panelOpen && (
+          <div className="panel-collapsed" aria-live="polite">
+            {picking ? (
+              <p>
+                Tap the map to set the <strong>{picking}</strong>.{' '}
+                <button className="text-button" onClick={() => beginPicking(null)} type="button">
+                  Cancel
+                </button>
+              </p>
+            ) : (
+              route && (
+                <p>
+                  <strong>{formatDuration(route.totalMinutes)}</strong> ·{' '}
+                  {(route.distanceM / 1000).toFixed(1)} km · {route.locks.length}{' '}
+                  {route.locks.length === 1 ? 'lock' : 'locks'}
+                </p>
+              )
+            )}
+            {pickError && <p className="is-problem">{pickError}</p>}
+            {progress ? (
+              <p>
+                {progress.arrived
+                  ? 'You’ve arrived.'
+                  : `${formatDuration(progress.remainingMinutes)} to go${
+                      progress.nextLock ? ` · next: ${progress.nextLock.name}` : ''
+                    }`}
+              </p>
+            ) : (
+              positionMessage && (
+                <p className={positionMessage.tone === 'problem' ? 'is-problem' : undefined}>
+                  {positionMessage.text}
+                </p>
+              )
             )}
           </div>
-          <fieldset className="lock-pace">
-            <legend>Lock working</legend>
-            {LOCK_SPEEDS.map(({ value, label }) => (
-              <label key={value} className={lockSpeed === value ? 'is-selected' : ''}>
-                <input
-                  checked={lockSpeed === value}
-                  name="lock-pace"
-                  onChange={() => setLockSpeed(value)}
-                  type="radio"
-                  value={value}
-                />
-                <span>{label}</span>
-                <small>{LOCK_MINUTES[value]} min/lock</small>
-              </label>
-            ))}
-          </fieldset>
+        )}
+        <div className="panel-body" hidden={!panelOpen} id="panel-body">
+          <p className="map-summary">
+            {graph.edges.length} canal sections · {graph.nodes.length} graph nodes
+          </p>
+          <section className="route-planner" aria-label="Route planner">
+            <div className="route-planner-heading">
+              <h2>Plan a route</h2>
+              {(start || finish) && (
+                <button className="text-button" onClick={clearRoute} type="button">
+                  Clear
+                </button>
+              )}
+            </div>
+            <fieldset className="lock-pace">
+              <legend>Lock working</legend>
+              {LOCK_SPEEDS.map(({ value, label }) => (
+                <label key={value} className={lockSpeed === value ? 'is-selected' : ''}>
+                  <input
+                    checked={lockSpeed === value}
+                    name="lock-pace"
+                    onChange={() => setLockSpeed(value)}
+                    type="radio"
+                    value={value}
+                  />
+                  <span>{label}</span>
+                  <small>{LOCK_MINUTES[value]} min/lock</small>
+                </label>
+              ))}
+            </fieldset>
+            <button
+              className={`plan-button${picking ? ' is-active' : ''}`}
+              onClick={togglePicking}
+              type="button"
+            >
+              {picking ? 'Cancel' : start && finish ? 'Pick new points' : 'Pick start and finish'}
+            </button>
+            {picking && (
+              <p className="route-hint">
+                Click the map to set the <strong>{picking}</strong>. Press Esc to cancel.
+              </p>
+            )}
+            {pickError && (
+              <p className="route-error" role="alert">
+                {pickError}
+              </p>
+            )}
+            {routeResult?.error && (
+              <p className="route-error" role="alert">
+                {routeResult.error}
+              </p>
+            )}
+            {route && (
+              <div className="route-summary" aria-live="polite">
+                <p className="route-total">
+                  {formatDuration(route.totalMinutes)}
+                  <span> fastest at {lockSpeed} lock working</span>
+                </p>
+                <dl className="route-stats">
+                  <div>
+                    <dt>Distance</dt>
+                    <dd>{(route.distanceM / 1000).toFixed(1)} km</dd>
+                  </div>
+                  <div>
+                    <dt>Cruising</dt>
+                    <dd>{formatDuration(route.cruiseMinutes)}</dd>
+                  </div>
+                  <div>
+                    <dt>Locks</dt>
+                    <dd>
+                      {route.locks.length}
+                      {route.locks.length > 0 && <small>{formatDuration(route.lockMinutes)}</small>}
+                    </dd>
+                  </div>
+                </dl>
+                {route.locks.length > 0 && (
+                  <details className="route-locks">
+                    <summary>Locks in order</summary>
+                    <ol>
+                      {route.locks.map((lock, index) => (
+                        <li key={`${index}-${lock.name}`}>{lock.name}</li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
+                <p className="route-note">
+                  Drag the markers to adjust. Cruising at {DEFAULT_SPEED_KMH} km/h (4 mph).
+                </p>
+              </div>
+            )}
+          </section>
+          <section className="my-position" aria-label="My position">
+            <div className="route-planner-heading">
+              <h2>My position</h2>
+              {position.simulated && <span className="simulated-badge">Simulated GPS</span>}
+            </div>
+            <button
+              className={`position-button${position.active ? ' is-active' : ''}`}
+              onClick={togglePosition}
+              type="button"
+            >
+              {position.active ? 'Stop showing my position' : 'Show my position'}
+            </button>
+            {positionMessage && (
+              <p className={`position-status is-${positionMessage.tone}`} role="status">
+                {positionMessage.text}
+              </p>
+            )}
+            {progress && (
+              <p className="position-progress">
+                {progress.arrived ? (
+                  <strong>You’ve arrived.</strong>
+                ) : (
+                  <>
+                    <strong>{formatDuration(progress.remainingMinutes)}</strong> to go ·{' '}
+                    {(progress.remainingM / 1000).toFixed(1)} km · {progress.locksLeft}{' '}
+                    {progress.locksLeft === 1 ? 'lock' : 'locks'} left
+                    {progress.nextLock && (
+                      <span>
+                        {progress.nextLock.inM < 15
+                          ? `At ${progress.nextLock.name}`
+                          : `Next: ${progress.nextLock.name} in ${
+                              progress.nextLock.inM < 1000
+                                ? `${Math.round(progress.nextLock.inM / 10) * 10} m`
+                                : `${(progress.nextLock.inM / 1000).toFixed(1)} km`
+                            }`}
+                      </span>
+                    )}
+                  </>
+                )}
+              </p>
+            )}
+            {position.active && (
+              <div className="position-actions">
+                {!following && myCoord && (
+                  <button className="text-button" onClick={recentre} type="button">
+                    Re-centre on me
+                  </button>
+                )}
+                {myCoord && !picking && (
+                  <button className="text-button" onClick={startFromMyPosition} type="button">
+                    {route ? 'Re-plan from here' : 'Start a route from here'}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
           <button
-            className={`plan-button${picking ? ' is-active' : ''}`}
-            onClick={togglePicking}
+            className="fit-route-button"
+            onClick={() => mapRef.current?.fitBounds(routeBounds, { padding: 48 })}
             type="button"
           >
-            {picking ? 'Cancel' : start && finish ? 'Pick new points' : 'Pick start and finish'}
+            Show full route
           </button>
-          {picking && (
-            <p className="route-hint">
-              Click the map to set the <strong>{picking}</strong>. Press Esc to cancel.
-            </p>
-          )}
-          {pickError && (
-            <p className="route-error" role="alert">
-              {pickError}
-            </p>
-          )}
-          {routeResult?.error && (
-            <p className="route-error" role="alert">
-              {routeResult.error}
-            </p>
-          )}
-          {route && (
-            <div className="route-summary" aria-live="polite">
-              <p className="route-total">
-                {formatDuration(route.totalMinutes)}
-                <span> fastest at {lockSpeed} lock working</span>
-              </p>
-              <dl className="route-stats">
-                <div>
-                  <dt>Distance</dt>
-                  <dd>{(route.distanceM / 1000).toFixed(1)} km</dd>
-                </div>
-                <div>
-                  <dt>Cruising</dt>
-                  <dd>{formatDuration(route.cruiseMinutes)}</dd>
-                </div>
-                <div>
-                  <dt>Locks</dt>
-                  <dd>
-                    {route.locks.length}
-                    {route.locks.length > 0 && <small>{formatDuration(route.lockMinutes)}</small>}
-                  </dd>
-                </div>
-              </dl>
-              {route.locks.length > 0 && (
-                <details className="route-locks">
-                  <summary>Locks in order</summary>
-                  <ol>
-                    {route.locks.map((lock, index) => (
-                      <li key={`${index}-${lock.name}`}>{lock.name}</li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-              <p className="route-note">
-                Drag the markers to adjust. Cruising at {DEFAULT_SPEED_KMH} km/h (4 mph).
-              </p>
-            </div>
-          )}
-        </section>
-        <section className="my-position" aria-label="My position">
-          <div className="route-planner-heading">
-            <h2>My position</h2>
-            {position.simulated && <span className="simulated-badge">Simulated GPS</span>}
+          <div className="map-toggles">
+            <label>
+              <input
+                checked
+                disabled
+                type="checkbox"
+                aria-label="Show waterways"
+              />
+              <span className="legend-line" />
+              Waterways
+            </label>
+            <label className="map-toggle-wide">
+              <input
+                checked={showNodes}
+                onChange={(event) => setShowNodes(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="legend-icons">
+                <LegendIcon name="lock" />
+                <LegendIcon name="junction" />
+                <LegendIcon name="winding" />
+              </span>
+              Locks, junctions &amp; winding holes
+            </label>
+            <label>
+              <input
+                checked={showBridges}
+                onChange={(event) => setShowBridges(event.target.checked)}
+                type="checkbox"
+              />
+              <LegendIcon name="bridge" />
+              Bridges ({graphCounts.bridges})
+            </label>
+            <label>
+              <input
+                checked={showBoundary}
+                onChange={(event) => setShowBoundary(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="legend-boundary" />
+              Region boundary
+            </label>
+            <label>
+              <input
+                checked={showMarinas}
+                onChange={(event) => setShowMarinas(event.target.checked)}
+                type="checkbox"
+              />
+              <LegendIcon name="marina" />
+              Marinas ({marinaFeatures.length})
+            </label>
           </div>
-          <button
-            className={`position-button${position.active ? ' is-active' : ''}`}
-            onClick={togglePosition}
-            type="button"
-          >
-            {position.active ? 'Stop showing my position' : 'Show my position'}
-          </button>
-          {positionMessage && (
-            <p className={`position-status is-${positionMessage.tone}`} role="status">
-              {positionMessage.text}
-            </p>
-          )}
-          {progress && (
-            <p className="position-progress">
-              {progress.arrived ? (
-                <strong>You’ve arrived.</strong>
-              ) : (
-                <>
-                  <strong>{formatDuration(progress.remainingMinutes)}</strong> to go ·{' '}
-                  {(progress.remainingM / 1000).toFixed(1)} km · {progress.locksLeft}{' '}
-                  {progress.locksLeft === 1 ? 'lock' : 'locks'} left
-                  {progress.nextLock && (
-                    <span>
-                      {progress.nextLock.inM < 15
-                        ? `At ${progress.nextLock.name}`
-                        : `Next: ${progress.nextLock.name} in ${
-                            progress.nextLock.inM < 1000
-                              ? `${Math.round(progress.nextLock.inM / 10) * 10} m`
-                              : `${(progress.nextLock.inM / 1000).toFixed(1)} km`
-                          }`}
-                    </span>
-                  )}
-                </>
-              )}
-            </p>
-          )}
-          {position.active && (
-            <div className="position-actions">
-              {!following && myCoord && (
-                <button className="text-button" onClick={recentre} type="button">
-                  Re-centre on me
-                </button>
-              )}
-              {myCoord && !picking && (
-                <button className="text-button" onClick={startFromMyPosition} type="button">
-                  {route ? 'Re-plan from here' : 'Start a route from here'}
-                </button>
-              )}
-            </div>
-          )}
-        </section>
-        <button
-          className="fit-route-button"
-          onClick={() => mapRef.current?.fitBounds(routeBounds, { padding: 48 })}
-          type="button"
-        >
-          Show full route
-        </button>
-        <div className="map-toggles">
-          <label>
-            <input
-              checked
-              disabled
-              type="checkbox"
-              aria-label="Show waterways"
-            />
-            <span className="legend-line" />
-            Waterways
-          </label>
-          <label className="map-toggle-wide">
-            <input
-              checked={showNodes}
-              onChange={(event) => setShowNodes(event.target.checked)}
-              type="checkbox"
-            />
-            <span className="legend-icons">
-              <LegendIcon name="lock" />
-              <LegendIcon name="junction" />
-              <LegendIcon name="winding" />
-            </span>
-            Locks, junctions &amp; winding holes
-          </label>
-          <label>
-            <input
-              checked={showBridges}
-              onChange={(event) => setShowBridges(event.target.checked)}
-              type="checkbox"
-            />
-            <LegendIcon name="bridge" />
-            Bridges ({graphCounts.bridges})
-          </label>
-          <label>
-            <input
-              checked={showBoundary}
-              onChange={(event) => setShowBoundary(event.target.checked)}
-              type="checkbox"
-            />
-            <span className="legend-boundary" />
-            Region boundary
-          </label>
-          <label>
-            <input
-              checked={showMarinas}
-              onChange={(event) => setShowMarinas(event.target.checked)}
-              type="checkbox"
-            />
-            <LegendIcon name="marina" />
-            Marinas ({marinaFeatures.length})
-          </label>
+          <p className="map-help">Click a symbol or line for its details. Lock names and numbers come from Canal &amp; River Trust open data.</p>
         </div>
-        <p className="map-help">Click a symbol or line for its details. Lock names and numbers come from Canal &amp; River Trust open data.</p>
       </section>
     </main>
   )

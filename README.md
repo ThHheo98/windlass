@@ -153,6 +153,16 @@ locks and other features, bridges, marinas and the region boundary. Use “Show
 full route” to fit the canal network in view, and click a symbol or line for
 its details; a lock shows its waterway and CRT asset id.
 
+The panel collapses with the chevron in its header. On a phone it starts
+collapsed and folds away when you pick route points, so the map stays visible.
+The collapsed bar still shows the route, your position and progress, and the
+"tap the map" prompt with Cancel. On touch screens a quick tap on the map acts
+as a click, because MapLibre otherwise swallows it.
+
+The app icon is an original narrowboat drawing (`public/favicon.svg`), with PNG
+versions and a web manifest, so **Add to Home Screen** on a phone shows the
+boat and the name Windlass.
+
 To plan a trip, choose a lock working pace (slow, medium or fast), press “Pick
 start and finish”, then click the map twice. Each click snaps to the nearest
 canal and is rejected if it is more than 500 m away. The fastest route is drawn
