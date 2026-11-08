@@ -160,11 +160,18 @@ with its locks marked. The panel shows the total time, distance, cruising time
 and lock time, plus the locks in order. Drag either marker to adjust the route;
 changing the pace recalculates it straight away. Press Esc to cancel picking.
 
-Raw OSM data is made available under the Open Database License (ODbL); the
-snapshot includes the attribution returned by OpenStreetMap. Lock data is
-© Canal & River Trust copyright and database rights reserved, and © Crown
-copyright and database rights, Ordnance Survey 100022432, used under the
-[CRT data licence](https://canalrivertrust.org.uk/refresh/media/thumbnail/26503-CRT-Data-Licence.pdf).
+**Data licences** (details in [`data/LICENSE.md`](data/LICENSE.md)):
+
+- **OpenStreetMap:** waterways, bridges, marinas and the background map tiles
+  are © OpenStreetMap contributors, under the
+  [Open Database License (ODbL)](https://www.openstreetmap.org/copyright). The
+  graph files built from them are offered under the ODbL too.
+- **Canal & River Trust:** lock data is © Canal & River Trust copyright and
+  database rights reserved, and © Crown copyright and database rights, Ordnance
+  Survey 100022432. It contains public sector information licensed under the
+  [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+The map's attribution line credits both.
 
 ## Routing
 
