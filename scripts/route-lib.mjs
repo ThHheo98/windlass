@@ -72,23 +72,29 @@ function projectOntoSegment(p, a, b) {
   return { t, coord: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t] }
 }
 
+/**
+ * Nearest point on one edge to a [lon, lat]: its coordinate, distance from the
+ * point, and distance along the edge (in the edge's surveyed length).
+ */
+export function projectToEdge(edge, point) {
+  const along = edgeAlongM(edge)
+  let best = null
+  for (let i = 1; i < edge.coords.length; i += 1) {
+    const { t, coord } = projectOntoSegment(point, edge.coords[i - 1], edge.coords[i])
+    const distanceM = haversineM(point, coord)
+    if (!best || distanceM < best.distanceM) {
+      best = { edge, coord, distanceM, alongM: along[i - 1] + (along[i] - along[i - 1]) * t }
+    }
+  }
+  return best
+}
+
 /** Snap a [lon, lat] to the nearest point on any graph edge. */
 export function snapToNetwork(graph, point, maxDistanceM = MAX_SNAP_DISTANCE_M) {
   let best = null
   for (const edge of graph.edges) {
-    const along = edgeAlongM(edge)
-    for (let i = 1; i < edge.coords.length; i += 1) {
-      const { t, coord } = projectOntoSegment(point, edge.coords[i - 1], edge.coords[i])
-      const distanceM = haversineM(point, coord)
-      if (!best || distanceM < best.distanceM) {
-        best = {
-          edge,
-          coord,
-          distanceM,
-          alongM: along[i - 1] + (along[i] - along[i - 1]) * t,
-        }
-      }
-    }
+    const candidate = projectToEdge(edge, point)
+    if (candidate && (!best || candidate.distanceM < best.distanceM)) best = candidate
   }
   if (!best || best.distanceM > maxDistanceM) return null
   if (best.alongM <= END_SNAP_M) best.alongM = 0
@@ -204,6 +210,7 @@ export function findRoute(graph, from, to, options = {}) {
       locks.push({
         name: lockName(step.edge),
         number: step.edge.lockNumber ?? null,
+        lengthM: step.edge.lengthM,
         waterway: step.edge.waterwayName ?? null,
         coord: piece[Math.floor(piece.length / 2)],
         atM: distanceM,

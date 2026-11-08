@@ -36,6 +36,7 @@ export type Route = {
   locks: {
     name: string
     number: string | null
+    lengthM: number
     waterway: string | null
     coord: LonLat
     atM: number
@@ -66,6 +67,8 @@ export declare function travelMinutes(
   passesLock: boolean,
   options?: RouteOptions,
 ): number
+
+export declare function projectToEdge(edge: RouteEdge, point: LonLat): Snap | null
 
 export declare function snapToNetwork(
   graph: RouteGraph,
