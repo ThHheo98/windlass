@@ -405,12 +405,15 @@ function App() {
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
       },
-      center: [-0.1276, 51.5072],
-      zoom: 10,
+      // Start on the canal network so the first tiles fetched are the ones shown.
+      bounds: routeBounds,
+      fitBoundsOptions: { padding: 48 },
     })
     mapRef.current = map
 
-    map.on('load', async () => {
+    // 'style.load' fires once our inline style is parsed. 'load' would also wait
+    // for the first background tiles, holding back the canal layers.
+    map.once('style.load', async () => {
       await addMapIcons(map)
       // React StrictMode may have torn this map down while the icons loaded.
       if (mapRef.current !== map) return
@@ -655,10 +658,6 @@ function App() {
         }
       })
 
-      map.fitBounds(
-        routeBounds,
-        { padding: 48 },
-      )
       setMapReady(true)
     })
 
