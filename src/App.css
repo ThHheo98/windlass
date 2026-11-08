@@ -194,7 +194,8 @@
   margin-bottom: 10px;
 }
 
-.route-planner h2 {
+.route-planner h2,
+.my-position h2 {
   margin: 0;
   color: #19343e;
   font-size: 14px;
@@ -394,6 +395,95 @@
   padding-left: 20px;
   color: #263b45;
   line-height: 1.6;
+}
+
+.my-position {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid #d5e2e5;
+  border-radius: 10px;
+  background: #f7fafb;
+}
+
+.simulated-badge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fff3bf;
+  color: #8a5a00;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.position-button {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #228be6;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.position-button:hover {
+  background: #1c7ed6;
+}
+
+.position-button.is-active {
+  background: #fff;
+  color: #1c7ed6;
+  box-shadow: inset 0 0 0 1px #1c7ed6;
+}
+
+.position-button:focus-visible {
+  outline: 2px solid #1c7ed6;
+  outline-offset: 2px;
+}
+
+.position-status {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.position-status.is-ok {
+  background: #e7f5ff;
+  color: #1864ab;
+}
+
+.position-status.is-wait {
+  background: #f1f3f5;
+  color: #495057;
+}
+
+.position-status.is-problem {
+  background: #fce8e4;
+  color: #a13d2c;
+}
+
+.position-progress {
+  margin: 8px 0 0;
+  color: #263b45;
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.position-progress span {
+  display: block;
+  color: #58727e;
+  font-size: 11px;
+}
+
+.position-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
 }
 
 @media (max-width: 540px) {

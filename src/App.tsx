@@ -24,6 +24,7 @@ import {
   type Route,
 } from '../scripts/route-lib.mjs'
 import { addMapIcons, iconSize, iconUrl, type IconName } from './mapIcons'
+import { useMyPosition, type PositionState } from './useMyPosition'
 import './App.css'
 
 type PickTarget = 'start' | 'finish'
@@ -76,6 +77,76 @@ function routeFeatures(route: Route | null) {
         geometry: { type: 'Point' as const, coordinates: lock.coord },
       })),
     },
+  }
+}
+
+/** A polygon approximating a circle of `radiusM` metres around a point. */
+function circlePolygon([lon, lat]: LonLat, radiusM: number, steps = 48): LonLat[] {
+  const metresPerDegreeLon = 111_320 * Math.cos((lat * Math.PI) / 180)
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const angle = (i / steps) * 2 * Math.PI
+    return [
+      lon + (Math.cos(angle) * radiusM) / metresPerDegreeLon,
+      lat + (Math.sin(angle) * radiusM) / 110_540,
+    ] as LonLat
+  })
+}
+
+type PositionFeature = {
+  type: 'Feature'
+  properties: Record<string, string | boolean>
+  geometry: { type: 'Polygon'; coordinates: LonLat[][] } | { type: 'Point'; coordinates: LonLat }
+}
+
+/** The snapped position dot and the raw GPS accuracy circle. */
+function positionFeatures(state: PositionState) {
+  const features: PositionFeature[] = []
+  if ('raw' in state) {
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'accuracy' },
+      geometry: { type: 'Polygon', coordinates: [circlePolygon(state.raw.coord, state.raw.accuracyM)] },
+    })
+    if (state.coord) {
+      features.push({
+        type: 'Feature',
+        properties: {
+          kind: 'dot',
+          onCanal: state.status === 'tracking' || state.status === 'held',
+        },
+        geometry: { type: 'Point', coordinates: state.coord },
+      })
+    }
+  }
+  return { type: 'FeatureCollection' as const, features }
+}
+
+function describePosition(state: PositionState): { text: string; tone: 'ok' | 'wait' | 'problem' } | null {
+  const accuracy = 'raw' in state ? Math.round(state.raw.accuracyM) : 0
+  switch (state.status) {
+    case 'off':
+      return null
+    case 'locating':
+      return { text: 'Finding your position…', tone: 'wait' }
+    case 'searching':
+      return { text: 'You’re not near a canal on the map yet.', tone: 'problem' }
+    case 'tracking':
+      return { text: `On the canal · GPS ±${accuracy} m`, tone: 'ok' }
+    case 'held':
+      return { text: 'Checking an unexpected GPS jump…', tone: 'wait' }
+    case 'off-canal':
+      return { text: 'You’re away from the canal. Showing your last position on it.', tone: 'problem' }
+    case 'off-route':
+      return { text: 'You’re away from the planned route. Showing your last position on it.', tone: 'problem' }
+    case 'low-accuracy':
+      return { text: `Waiting for a better GPS signal (±${accuracy} m)…`, tone: 'wait' }
+    case 'denied':
+      return {
+        text: 'Location is blocked for this site. Allow it in your browser’s site settings, then try again.',
+        tone: 'problem',
+      }
+    case 'unavailable':
+      return { text: state.reason, tone: 'problem' }
   }
 }
 
@@ -332,6 +403,12 @@ function App() {
     finish: null,
   })
   const fittedRouteKey = useRef<string | null>(null)
+  const [following, setFollowing] = useState(true)
+  const followingRef = useRef(following)
+  const zoomToPosition = useRef(true)
+  useEffect(() => {
+    followingRef.current = following
+  }, [following])
 
   const beginPicking = (target: PickTarget | null) => {
     pickingRef.current = target
@@ -347,6 +424,40 @@ function App() {
     }
   }, [start, finish, lockSpeed])
   const route = routeResult?.route ?? null
+
+  // Without a planned route, a simulation replays the whole network route.
+  const fallbackRoute = useMemo(() => {
+    const { start: from, finish: to } = graph.anchors
+    if (!from || !to) return null
+    const [a, b] = [graph.nodes[from.vertexId], graph.nodes[to.vertexId]]
+    try {
+      return findRoute(graph, [a.lon, a.lat], [b.lon, b.lat], { lockSpeed })
+    } catch {
+      return null
+    }
+  }, [lockSpeed])
+  const position = useMyPosition({ graph, route, fallbackRoute, lockSpeed })
+  const positionMessage = describePosition(position.state)
+  const myCoord = 'coord' in position.state ? position.state.coord : null
+  const progress = 'progress' in position.state ? position.state.progress : undefined
+
+  // Map padding that keeps a point or route clear of the panel: beside it on
+  // wide screens, below it when it spans the width of a phone.
+  const clearOfPanel = () => {
+    const panel = panelRef.current?.getBoundingClientRect()
+    const container = mapRef.current?.getContainer().getBoundingClientRect()
+    const padding = { top: 48, bottom: 48, left: 48, right: 48 }
+    if (!panel || !container) return padding
+    if (panel.right > container.width * 0.6) {
+      return {
+        top: Math.min(panel.bottom + 24, container.height * 0.7),
+        bottom: 24,
+        left: 24,
+        right: 24,
+      }
+    }
+    return { ...padding, left: panel.right + 32 }
+  }
 
   useEffect(() => {
     if (!mapContainer.current) return
@@ -561,6 +672,38 @@ function App() {
         },
       })
 
+      map.addSource('my-position', { type: 'geojson', data: positionFeatures({ status: 'off' }) })
+      map.addLayer({
+        id: 'my-accuracy',
+        type: 'fill',
+        source: 'my-position',
+        filter: ['==', ['get', 'kind'], 'accuracy'],
+        paint: { 'fill-color': '#228be6', 'fill-opacity': 0.12 },
+      })
+      map.addLayer({
+        id: 'my-accuracy-outline',
+        type: 'line',
+        source: 'my-position',
+        filter: ['==', ['get', 'kind'], 'accuracy'],
+        paint: { 'line-color': '#228be6', 'line-opacity': 0.45, 'line-width': 1 },
+      })
+      map.addLayer({
+        id: 'my-position',
+        type: 'circle',
+        source: 'my-position',
+        filter: ['==', ['get', 'kind'], 'dot'],
+        paint: {
+          'circle-radius': 8,
+          'circle-color': ['case', ['boolean', ['get', 'onCanal'], false], '#228be6', '#868e96'],
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': 3,
+        },
+      })
+      // Panning the map stops it following your position.
+      map.on('dragstart', () => {
+        if (followingRef.current) setFollowing(false)
+      })
+
       // One handler for every clickable layer, so only the top-most feature under
       // the pointer (a lock symbol rather than the canal beneath it) opens a popup.
       // The popup is closed here rather than with closeOnClick, whose own click
@@ -701,23 +844,25 @@ function App() {
         (box, coord) => box.extend(coord),
         new LngLatBounds(route.coords[0], route.coords[0]),
       )
-      // Keep the route clear of the panel: beside it on wide screens, below it
-      // when it spans the width of a phone.
-      const panel = panelRef.current?.getBoundingClientRect()
-      const container = map.getContainer().getBoundingClientRect()
-      const padding = { top: 48, bottom: 48, left: 48, right: 48 }
-      if (panel && panel.right > container.width * 0.6) {
-        padding.top = Math.min(panel.bottom + 24, container.height * 0.7)
-        padding.left = 24
-        padding.right = 24
-        padding.bottom = 24
-      } else if (panel) {
-        padding.left = panel.right + 32
-      }
-      map.fitBounds(bounds, { padding, maxZoom: 15 })
+      map.fitBounds(bounds, { padding: clearOfPanel(), maxZoom: 15 })
     }
     fittedRouteKey.current = key
   }, [route, start, finish, mapReady])
+
+  // Draw your position, and keep it in view while following.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    ;(map.getSource('my-position') as GeoJSONSource | undefined)?.setData(
+      positionFeatures(position.state),
+    )
+    if (following && myCoord) {
+      const zoom = zoomToPosition.current ? Math.max(map.getZoom(), 15) : map.getZoom()
+      zoomToPosition.current = false
+      map.easeTo({ center: myCoord, zoom, padding: clearOfPanel(), duration: 400 })
+    }
+    // clearOfPanel only reads refs, so it isn't a dependency.
+  }, [position.state, myCoord, following, mapReady])
 
   useEffect(() => {
     if (!picking) return
@@ -730,6 +875,29 @@ function App() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [picking])
+
+  const togglePosition = () => {
+    if (position.active) {
+      position.stop()
+      return
+    }
+    zoomToPosition.current = true
+    setFollowing(true)
+    position.start()
+  }
+
+  const recentre = () => {
+    zoomToPosition.current = true
+    setFollowing(true)
+  }
+
+  // Plan from where you are: replaces the start, keeping any finish.
+  const startFromMyPosition = () => {
+    if (!myCoord) return
+    setPickError(null)
+    setStart(myCoord)
+    if (!finish) beginPicking('finish')
+  }
 
   const clearRoute = () => {
     beginPicking(null)
@@ -875,6 +1043,62 @@ function App() {
               <p className="route-note">
                 Drag the markers to adjust. Cruising at {DEFAULT_SPEED_KMH} km/h (4 mph).
               </p>
+            </div>
+          )}
+        </section>
+        <section className="my-position" aria-label="My position">
+          <div className="route-planner-heading">
+            <h2>My position</h2>
+            {position.simulated && <span className="simulated-badge">Simulated GPS</span>}
+          </div>
+          <button
+            className={`position-button${position.active ? ' is-active' : ''}`}
+            onClick={togglePosition}
+            type="button"
+          >
+            {position.active ? 'Stop showing my position' : 'Show my position'}
+          </button>
+          {positionMessage && (
+            <p className={`position-status is-${positionMessage.tone}`} role="status">
+              {positionMessage.text}
+            </p>
+          )}
+          {progress && (
+            <p className="position-progress">
+              {progress.arrived ? (
+                <strong>You’ve arrived.</strong>
+              ) : (
+                <>
+                  <strong>{formatDuration(progress.remainingMinutes)}</strong> to go ·{' '}
+                  {(progress.remainingM / 1000).toFixed(1)} km · {progress.locksLeft}{' '}
+                  {progress.locksLeft === 1 ? 'lock' : 'locks'} left
+                  {progress.nextLock && (
+                    <span>
+                      {progress.nextLock.inM < 15
+                        ? `At ${progress.nextLock.name}`
+                        : `Next: ${progress.nextLock.name} in ${
+                            progress.nextLock.inM < 1000
+                              ? `${Math.round(progress.nextLock.inM / 10) * 10} m`
+                              : `${(progress.nextLock.inM / 1000).toFixed(1)} km`
+                          }`}
+                    </span>
+                  )}
+                </>
+              )}
+            </p>
+          )}
+          {position.active && (
+            <div className="position-actions">
+              {!following && myCoord && (
+                <button className="text-button" onClick={recentre} type="button">
+                  Re-centre on me
+                </button>
+              )}
+              {myCoord && !picking && (
+                <button className="text-button" onClick={startFromMyPosition} type="button">
+                  {route ? 'Re-plan from here' : 'Start a route from here'}
+                </button>
+              )}
             </div>
           )}
         </section>
