@@ -185,6 +185,8 @@ export function findRoute(graph, from, to, options = {}) {
     if (step.edge.lock && isWholeEdge(step)) {
       locks.push({
         name: lockName(step.edge),
+        number: step.edge.lockNumber ?? null,
+        waterway: step.edge.waterwayName ?? null,
         coord: piece[Math.floor(piece.length / 2)],
         atM: distanceM,
       })

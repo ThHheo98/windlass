@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { access, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildGraph } from './graph-lib.mjs'
@@ -6,10 +6,21 @@ import { buildGraph } from './graph-lib.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const inputPath = resolve(root, 'data/osm/raw.json')
 const outputPath = resolve(root, 'data/graph/graph.json')
+const crtLocksPath = resolve(root, 'data/crt/locks.geojson')
+
+async function readCrtLocks() {
+  try {
+    await access(crtLocksPath)
+  } catch {
+    return null
+  }
+  return JSON.parse(await readFile(crtLocksPath, 'utf8'))
+}
 
 async function main() {
   const raw = JSON.parse(await readFile(inputPath, 'utf8'))
-  const { graph, summary } = buildGraph(raw)
+  const crtLocks = await readCrtLocks()
+  const { graph, summary } = buildGraph(raw, { crtLocks })
 
   await mkdir(dirname(outputPath), { recursive: true })
   await writeFile(
@@ -35,6 +46,16 @@ async function main() {
       .join(', ')}`,
   )
   console.log(`Bridge crossings: ${summary.bridgeCount}`)
+  console.log(`Marinas beside the route: ${graph.marinas.length}`)
+  if (summary.droppedEdges.length > 0) {
+    console.log(
+      `Dropped ${summary.droppedEdges.length} edges cut off from the route: ` +
+        summary.droppedEdges
+          .map((edge) => `${edge.name ?? edge.id} (${Math.round(edge.lengthM)} m)`)
+          .join(', '),
+    )
+  }
+  const crtOk = reportCrt(summary.crt)
   console.log(`Off-line winding holes for Session 3: ${summary.offLineWindingCount}`)
   console.log(`Packet Boat Marina: ${formatAnchor(summary.start)}`)
   console.log(`Pickett's Lock: ${formatAnchor(summary.finish)}`)
@@ -43,7 +64,7 @@ async function main() {
     console.log(
       summary.componentCount === 1 ? 'CONNECTED' : 'ENDPOINTS CONNECTED; CHECK COMPONENTS',
     )
-    if (summary.componentCount !== 1) process.exitCode = 1
+    if (summary.componentCount !== 1 || !crtOk) process.exitCode = 1
     return
   }
 
@@ -65,6 +86,26 @@ async function main() {
   }
   console.error(`Graph written to data/graph/graph.json for inspection.`)
   process.exitCode = 1
+}
+
+function reportCrt(crt) {
+  if (!crt) {
+    console.log('CRT lock check: skipped (run npm run crt:fetch first)')
+    return true
+  }
+  console.log(`CRT lock check: ${crt.matched}/${crt.lockEdges} lock chambers matched`)
+  for (const lock of crt.outOfScopeCrtLocks) {
+    console.log(`  Out of scope: ${lock.description} (${lock.crtId}): ${lock.reason}`)
+  }
+  for (const lock of crt.unmatchedGraphLocks) {
+    console.error(`  No CRT lock within 40 m of graph lock ${lock.name ?? lock.id}`)
+  }
+  for (const lock of crt.missingCrtLocks) {
+    console.error(
+      `  CRT lock on the route but missing from the graph: ${lock.description} [${lock.waterway}] (${lock.crtId})`,
+    )
+  }
+  return crt.unmatchedGraphLocks.length === 0 && crt.missingCrtLocks.length === 0
 }
 
 function formatAnchor(anchor) {

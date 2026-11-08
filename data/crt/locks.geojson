@@ -1,0 +1,1224 @@
+{
+  "type": "FeatureCollection",
+  "source": "Canal & River Trust open data: Canal_And_River_Trust_Locks_View",
+  "attribution": "© Canal & River Trust copyright and database rights reserved. © Crown copyright and database rights, Ordnance Survey 100022432.",
+  "fetchedAt": "2026-11-08T11:25:03.059Z",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.431467731066185,
+          51.6812428905779
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-183-005",
+        "sap_description": "Lock 74, Lady Capels",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.426448718809214,
+          51.6720487493936
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-185-004",
+        "sap_description": "Lock 75, Cassiobury Park",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.427650628035912,
+          51.6707519925234
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-185-005",
+        "sap_description": "Lock 76, Cassiobury Park",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.426845387912931,
+          51.6643567891174
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-186-002",
+        "sap_description": "Lock 77, Ironbridge Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.427635709811617,
+          51.6544759878651
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-187-004",
+        "sap_description": "Lock 78, Cassiobridge Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.438694201966313,
+          51.6452444133662
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-188-002",
+        "sap_description": "Lock 79, Common Moor Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.450894344951317,
+          51.6379958533101
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-189-004",
+        "sap_description": "Lock 80, Lot Mead",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.466303300688265,
+          51.634879424829
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-191-007",
+        "sap_description": "Lock 81, Batchworth Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.481142771387772,
+          51.6301444433397
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-192-002",
+        "sap_description": "Lock 82, Stockers Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.494630545007515,
+          51.6255612426979
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-193-003",
+        "sap_description": "Lock 83, Springwell Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.498392295988078,
+          51.6109522478047
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-195-001",
+        "sap_description": "Lock 84, Copper Mill Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.495251706566597,
+          51.6024144964468
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-196-003",
+        "sap_description": "Lock 85, Black Jacks Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.48606896087928,
+          51.5876212889532
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-197-006",
+        "sap_description": "Lock 86, Widewater Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.482219413938805,
+          51.5653878319188
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-200-003",
+        "sap_description": "Lock 87, Denham Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.483514089687036,
+          51.5524917438906
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-201-004",
+        "sap_description": "Lock 88, Uxbridge Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.485695824568027,
+          51.528924343238
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-204-011",
+        "sap_description": "Lock 89, Cowley Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.363291606405916,
+          51.5017863855778
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-215-012",
+        "sap_description": "Lock 90, Norwood Top Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.359699219116335,
+          51.5031210369555
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-215-015",
+        "sap_description": "Lock 91, Norwood Bottom Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.3525227688926,
+          51.505142668184
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-216-004",
+        "sap_description": "Lock 92, Hanwell Top Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.350091207744665,
+          51.5054412100791
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-216-006",
+        "sap_description": "Lock 93, Hanwell Flight",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.34841893658807,
+          51.5054626379143
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-216-007",
+        "sap_description": "Lock 94, Hanwell Flight",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.34691908331798,
+          51.5050997976802
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-216-008",
+        "sap_description": "Lock 95, Hanwell Flight",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.345788094760332,
+          51.5044993450689
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-216-010",
+        "sap_description": "Lock 96, Hanwell Flight",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.344631266034453,
+          51.5038175845752
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-217-001",
+        "sap_description": "Lock 97, Hanwell Bottom Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.332639790430255,
+          51.4968044714428
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-218-004",
+        "sap_description": "Lock 98, Osterley Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.321472913696838,
+          51.4890105284055
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-219-004",
+        "sap_description": "Lock 99, Clitheroes Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.311708763971096,
+          51.4831061370652
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-220-015",
+        "sap_description": "Lock 100A, Brentford Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.311551748448463,
+          51.4830679059347
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-220-016",
+        "sap_description": "Lock 100B, Brentford Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.304629071329523,
+          51.4821587006581
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-221-012",
+        "sap_description": "Lock 101A, Thames Lock (House side)",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.304668923122525,
+          51.4822492047168
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GU-221-013",
+        "sap_description": "Lock 101B, Thames Lock (Boat yard side)",
+        "sap_object_type": "010",
+        "waterway_name": "Grand Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.466326426849112,
+          51.6350505818751
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "GX-001-001",
+        "sap_description": "Lock 81A, River Chess Lock",
+        "sap_object_type": "010",
+        "waterway_name": "River Chess (Grand Union Canal)"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0296792727945501,
+          51.5380951457347
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "HU-002-001",
+        "sap_description": "Lock 1, Top Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Hertford Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0274123653487683,
+          51.5391631919683
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "HU-002-003",
+        "sap_description": "Lock 2, Middle Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Hertford Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0245420696347823,
+          51.5405088129646
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "HU-002-009",
+        "sap_description": "Lock 3, Bottom Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Hertford Union Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0366820837958867,
+          51.5100833569823
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LB-001-007",
+        "sap_description": "Lock 1, Limehouse Ship Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Limehouse Basin"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.008215615724352,
+          51.5230478629345
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-001-003",
+        "sap_description": "Lock 20, Bow, River Lee Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.00801394937078947,
+          51.5230444377758
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-001-004",
+        "sap_description": "Lock 20, Bow, Bow Creek Side",
+        "sap_object_type": "038",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0208702334722961,
+          51.5380549246043
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-003-005",
+        "sap_description": "Lock 19, Old Ford Lock, Eastern Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0209995311731934,
+          51.5380660963551
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-003-006",
+        "sap_description": "Lock 19, Old Ford Lock, Western Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0562472186047208,
+          51.5880784699509
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-010-004",
+        "sap_description": "Lock 17, Tottenham Lock, Eastern Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0564480303615783,
+          51.588108776245
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-010-005",
+        "sap_description": "Lock 17, Tottenham Lock, Western Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0503894767954383,
+          51.5971084947552
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-011-002",
+        "sap_description": "Lock 16, Stonebridge Lock, Eastern Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0505170291566731,
+          51.5971645683574
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-011-003",
+        "sap_description": "Lock 16, Stonebridge Lock, Western Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0324015334395148,
+          51.6260877846764
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-014-001",
+        "sap_description": "Lock 15, Picketts Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.029965425267055,
+          51.6419546250942
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-016-005",
+        "sap_description": "Lock 14, Ponders End Lock, East Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0300942386378142,
+          51.6419837700351
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-016-007",
+        "sap_description": "Lock 14, Ponders End Lock, West Side",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.01818380599663,
+          51.6671966035594
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-019-008",
+        "sap_description": "Lock 13, Enfield Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0120473267412313,
+          51.6782081422021
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LN-020-006",
+        "sap_description": "Lock 12, Rammey Marsh Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Lee Navigation"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0164081100719235,
+          51.5418465109358
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "LO-001-002",
+        "sap_description": "Lock 1a, Carpenter's Road Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Old River Lea"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.00428253878005969,
+          51.5282687433493
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "PC-001-006",
+        "sap_description": "Lock 2012, Three Mills Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Prescott Channel"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.14565651592788,
+          51.5410475376905
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-004-017",
+        "sap_description": "Lock 1A, Hampstead Road Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.145726016530107,
+          51.5411115848279
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-004-018",
+        "sap_description": "Lock 1B, Hampstead Road Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.143987609091595,
+          51.5416596342125
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-004-021",
+        "sap_description": "Lock 2, Hawley Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.143786573983923,
+          51.5416384689213
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-004-022",
+        "sap_description": "Lock 2 Bypass Weir,Hawley Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.142493530246134,
+          51.541519088115
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-004-023",
+        "sap_description": "Lock 3, Bypass Weir Kentish Town Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.142447365936338,
+          51.5415902989341
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-004-024",
+        "sap_description": "Lock 3, Kentish Town Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.127931762293738,
+          51.5361618195394
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-006-009",
+        "sap_description": "Lock 4, St Pancras Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.127815375177717,
+          51.5361869407127
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-006-010",
+        "sap_description": "Lock 4 Bypass Weir,St Pancras Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0989060627867547,
+          51.5326824423415
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-008-004",
+        "sap_description": "Lock 5, City Road Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0987941643089076,
+          51.5325996942136
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-008-006",
+        "sap_description": "Lock 5 Bypass Weir,City Road Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0917021467577596,
+          51.5349664186639
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-008-015",
+        "sap_description": "Lock 6, Sturts Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.091646389161046,
+          51.534920547486
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-008-016",
+        "sap_description": "Lock 6 Bypass Weir, Sturts Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0638012427645711,
+          51.5356326020675
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-010-005",
+        "sap_description": "Lock 7, Actons Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0637898860800469,
+          51.535560475413
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-010-006",
+        "sap_description": "Lock 7 Bypass Weir, Actons lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0455709003357661,
+          51.5323626530413
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-012-003",
+        "sap_description": "Lock 8 Bypass Weir, Old Ford Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0455105722353219,
+          51.5324245967121
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-012-004",
+        "sap_description": "Lock 8, Old Ford Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0379984991436209,
+          51.525051245522
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-013-002",
+        "sap_description": "Lock 9 Bypass Weir, Mile End Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0378957254843545,
+          51.5250944904243
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-013-003",
+        "sap_description": "Lock 9, Mile End Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0362562459769066,
+          51.5196445541989
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-014-001",
+        "sap_description": "Lock 10, Johnsons Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.036371479044913,
+          51.5196464821697
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-014-002",
+        "sap_description": "Lock 10 Bypass Weir, Johnsons Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0348348852736939,
+          51.5148276022829
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-014-005",
+        "sap_description": "Lock 11, Salmons Lane Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0349345424422954,
+          51.514856249773
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-014-007",
+        "sap_description": "Lock 11 Bypass Weir, Salmons Lane Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0365297585881252,
+          51.5122840388063
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-014-012",
+        "sap_description": "Lock 12, Commercial Road Lock",
+        "sap_object_type": "010",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0366445863603989,
+          51.5122949533994
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "RE-014-013",
+        "sap_description": "Lock 12 Bypass Weir, Commercial Rd. Lock",
+        "sap_object_type": "018",
+        "waterway_name": "Regent's Canal"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.0105168822072522,
+          51.5013507043465
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "SD-001-052",
+        "sap_description": "West India Dock Entrance Lock",
+        "sap_object_type": "010",
+        "waterway_name": "South Dock"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.00921504659312721,
+          51.53318166571
+        ]
+      },
+      "properties": {
+        "sap_func_loc": "TK-001-002",
+        "sap_description": "Lock 1b, City Mill Lock",
+        "sap_object_type": "010",
+        "waterway_name": "St Thomas Creek"
+      }
+    }
+  ]
+}
