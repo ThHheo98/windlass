@@ -1,11 +1,14 @@
 import { access, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gzipSync } from 'node:zlib'
+import { encodeGraph, SIMPLIFY_TOLERANCE_M } from './graph-codec.mjs'
 import { buildGraph } from './graph-lib.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const inputPath = resolve(root, 'data/osm/raw.json')
 const outputPath = resolve(root, 'data/graph/graph.json')
+const compactPath = resolve(root, 'data/graph/graph.compact.json')
 const crtLocksPath = resolve(root, 'data/crt/locks.geojson')
 
 async function readCrtLocks() {
@@ -35,6 +38,11 @@ async function main() {
     )}\n`,
   )
 
+  // The browser loads the compact version; graph.json stays for inspection.
+  const fullGraph = { osmTimestamp: raw.osm3s?.timestamp_osm_base ?? null, ...graph }
+  const compactText = JSON.stringify(encodeGraph(fullGraph))
+  await writeFile(compactPath, `${compactText}\n`)
+
   console.log(`OSM waterway ways: ${summary.rawWaterwayWays}`)
   console.log(`In-scope canal/lock ways: ${summary.includedWaterwayWays}`)
   console.log(`Excluded waterway ways: ${summary.excludedWaterwayWays}`)
@@ -46,6 +54,11 @@ async function main() {
       .join(', ')}`,
   )
   console.log(`Bridge crossings: ${summary.bridgeCount}`)
+  console.log(
+    `Compact graph: ${(compactText.length / 1024).toFixed(1)} KB, ` +
+      `${(gzipSync(compactText).length / 1024).toFixed(1)} KB gzipped ` +
+      `(lines simplified to ${SIMPLIFY_TOLERANCE_M} m) -> data/graph/graph.compact.json`,
+  )
   console.log(`Marinas beside the route: ${graph.marinas.length}`)
   if (summary.droppedEdges.length > 0) {
     console.log(

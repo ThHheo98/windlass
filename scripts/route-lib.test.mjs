@@ -112,3 +112,9 @@ test('real graph: Packet Boat Marina to Pickett\'s Lock', () => {
   assert.ok(names.includes("Acton's Lock"))
   assert.ok(!graph.edges.some((edge) => /denham/i.test(edge.name ?? '')))
 })
+
+test('a point within END_SNAP_M of a lock gate still counts the lock', () => {
+  // Lock B runs from 0.0055 to 0.006; 0.0059999 is about 1 cm short of its end.
+  const route = findRoute(loopGraph(), [0.0045, 0], [0.0059999, 0], { lockSpeed: 'fast' })
+  assert.deepEqual(route.locks.map((lock) => lock.name), ['Lock B'])
+})

@@ -2,7 +2,7 @@ export type LonLat = [number, number]
 export type LockSpeed = 'slow' | 'medium' | 'fast'
 
 export type RouteEdge = {
-  id: string
+  id: string | number
   a: string | number
   b: string | number
   lengthM: number
@@ -54,6 +54,7 @@ export type RouteErrorCode =
 export declare const LOCK_MINUTES: Readonly<Record<LockSpeed, number>>
 export declare const DEFAULT_SPEED_KMH: number
 export declare const MAX_SNAP_DISTANCE_M: number
+export declare const END_SNAP_M: number
 
 export declare class RouteError extends Error {
   code: RouteErrorCode

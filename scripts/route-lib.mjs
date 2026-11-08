@@ -9,6 +9,13 @@ export const DEFAULT_SPEED_KMH = 6.4
 /** Clicks further than this from any canal are rejected. */
 export const MAX_SNAP_DISTANCE_M = 500
 
+/**
+ * A point that snaps this close to an edge's end is treated as being at that
+ * end. Shipped coordinates are rounded to ~1 m and lines simplified to 2 m, so a
+ * click on a lock gate must still count the lock as passed.
+ */
+export const END_SNAP_M = 2
+
 export class RouteError extends Error {
   constructor(code, message) {
     super(message)
@@ -37,12 +44,20 @@ export function travelMinutes(lengthM, passesLock, options) {
   return lengthM / metresPerMinute + (passesLock ? lockMinutes : 0)
 }
 
-function cumulativeM(coords) {
+/**
+ * Distance along an edge at each of its points, scaled so the last point sits
+ * at `edge.lengthM`. Shipped geometry is simplified and slightly shorter than
+ * the measured length; scaling keeps snapping and costs in the same units.
+ */
+function edgeAlongM(edge) {
+  const { coords } = edge
   const along = [0]
   for (let i = 1; i < coords.length; i += 1) {
     along.push(along[i - 1] + haversineM(coords[i - 1], coords[i]))
   }
-  return along
+  const total = along.at(-1)
+  const scale = total > 0 && edge.lengthM > 0 ? edge.lengthM / total : 1
+  return along.map((m) => m * scale)
 }
 
 /** Nearest point on segment a-b to p, using a local flat projection. */
@@ -61,7 +76,7 @@ function projectOntoSegment(p, a, b) {
 export function snapToNetwork(graph, point, maxDistanceM = MAX_SNAP_DISTANCE_M) {
   let best = null
   for (const edge of graph.edges) {
-    const along = cumulativeM(edge.coords)
+    const along = edgeAlongM(edge)
     for (let i = 1; i < edge.coords.length; i += 1) {
       const { t, coord } = projectOntoSegment(point, edge.coords[i - 1], edge.coords[i])
       const distanceM = haversineM(point, coord)
@@ -75,14 +90,17 @@ export function snapToNetwork(graph, point, maxDistanceM = MAX_SNAP_DISTANCE_M) 
       }
     }
   }
-  return best && best.distanceM <= maxDistanceM ? best : null
+  if (!best || best.distanceM > maxDistanceM) return null
+  if (best.alongM <= END_SNAP_M) best.alongM = 0
+  else if (best.alongM >= best.edge.lengthM - END_SNAP_M) best.alongM = best.edge.lengthM
+  return best
 }
 
 /** Coordinates of an edge between two along-distances, in travel order. */
 function sliceEdge(edge, fromM, toM) {
   if (fromM > toM) return sliceEdge(edge, toM, fromM).reverse()
 
-  const along = cumulativeM(edge.coords)
+  const along = edgeAlongM(edge)
   const pointAt = (m) => {
     for (let i = 1; i < along.length; i += 1) {
       if (m <= along[i] || i === along.length - 1) {
