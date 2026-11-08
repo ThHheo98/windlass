@@ -2,6 +2,7 @@ const ROUTE_WATERWAY_NAME =
   /^(?:grand union canal(?: - slough arm| \(paddington (?:branch|arm)\))?|regent.?s canal|islington tunnel \(regent.?s canal\)|hertford union canal|limehouse cut|(?:river )?lee navigation(?: \(hackney cut\))?|river lee)$/i
 const ANCHOR_NAME = /packet boat marina|pickett.?s lock|alfie.?s lock/i
 const EXCLUDED_LOCK_NAME = /thames|limehouse basin lock|bow creek|prescott/i
+const SCOPE_LIMIT_LOCK_NAME = /uxbridge lock|pickett.?s lock|alfie.?s lock/i
 const EARTH_RADIUS_M = 6_371_008.8
 
 export function haversineM([lon1, lat1], [lon2, lat2]) {
@@ -27,10 +28,22 @@ function geometryCoordinates(element) {
     .map((point) => [point.lon, point.lat])
 }
 
+// Prefer OSM lock_name; some locks only carry their name in lock_ref.
+function lockNameOf(way) {
+  const tags = way.tags ?? {}
+  if (tags.lock_name) return tags.lock_name
+  return /lock/i.test(tags.lock_ref ?? '') ? tags.lock_ref : undefined
+}
+
+function isNavigable(way) {
+  return way.tags?.boat !== 'no' && way.tags?.motorboat !== 'no'
+}
+
 function isRouteWaterway(way) {
   const waterway = way.tags?.waterway
   const name = way.tags?.name ?? ''
   return (
+    isNavigable(way) &&
     ['canal', 'river'].includes(waterway) &&
     ROUTE_WATERWAY_NAME.test(name) &&
     (!/^river lee$/i.test(name) || waterway === 'canal')
@@ -189,6 +202,7 @@ export function buildGraph(raw) {
   const lockWays = allWaterways.filter(
     (way) =>
       (way.tags?.lock === 'yes' || way.tags?.waterway === 'lock') &&
+      isNavigable(way) &&
       !EXCLUDED_LOCK_NAME.test(way.tags?.name ?? '') &&
       (way.nodes ?? []).some((id) => routeNodeIds.has(String(id))),
   )
@@ -294,6 +308,7 @@ export function buildGraph(raw) {
           0,
         ),
         lock: isLockChamber,
+        ...(isLockChamber && lockNameOf(way) ? { lockName: lockNameOf(way) } : {}),
         name: way.tags?.name,
         way: way.id,
         coords: edgeCoords,
@@ -358,6 +373,30 @@ export function buildGraph(raw) {
               !outsideBranch.has(candidate.b),
           )
         }
+      }
+    }
+  }
+
+  // SCOPE.md ends the route at Uxbridge Lock and Pickett's Lock: keep each lock
+  // and drop the waterway beyond it (Denham Deep, the Lee above Pickett's), as
+  // long as both endpoints stay connected.
+  if (start && finish) {
+    for (const scopeLock of routeEdges.filter(
+      (edge) =>
+        edge.lock && SCOPE_LIMIT_LOCK_NAME.test(edge.lockName ?? edge.name ?? ''),
+    )) {
+      const withoutLock = routeEdges.filter((edge) => edge.id !== scopeLock.id)
+      const startSide = reachableFrom(withoutLock, start.vertexId)
+      const farEnd = [scopeLock.a, scopeLock.b].find((id) => !startSide.has(id))
+      if (farEnd === undefined) continue
+
+      const beyond = reachableFrom(withoutLock, farEnd)
+      const trimmed = routeEdges.filter(
+        (edge) =>
+          edge.id === scopeLock.id || (!beyond.has(edge.a) && !beyond.has(edge.b)),
+      )
+      if (reachableFrom(trimmed, start.vertexId).has(finish.vertexId)) {
+        routeEdges = trimmed
       }
     }
   }

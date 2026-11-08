@@ -1,14 +1,81 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  LngLatBounds,
   Map,
+  Marker,
   NavigationControl,
   Popup,
   setWorkerUrl,
+  type GeoJSONSource,
 } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import graphJson from '../data/graph/graph.json?raw'
 import regionBoundary from '../data/region/london-mvp.geojson?raw'
+import {
+  DEFAULT_SPEED_KMH,
+  LOCK_MINUTES,
+  MAX_SNAP_DISTANCE_M,
+  RouteError,
+  findRoute,
+  snapToNetwork,
+  type LockSpeed,
+  type LonLat,
+  type Route,
+} from '../scripts/route-lib.mjs'
 import './App.css'
+
+type PickTarget = 'start' | 'finish'
+
+const LOCK_SPEEDS: { value: LockSpeed; label: string }[] = [
+  { value: 'slow', label: 'Slow' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'fast', label: 'Fast' },
+]
+
+const OFF_NETWORK_MESSAGE = `That point is more than ${MAX_SNAP_DISTANCE_M} m from a canal on the route. Click closer to a waterway.`
+
+function formatDuration(minutes: number) {
+  const rounded = Math.round(minutes)
+  const hours = Math.floor(rounded / 60)
+  const mins = rounded % 60
+  if (hours === 0) return `${mins} min`
+  return mins === 0 ? `${hours} h` : `${hours} h ${mins} min`
+}
+
+function routeErrorMessage(error: unknown) {
+  if (error instanceof RouteError) {
+    if (error.code === 'start-off-network' || error.code === 'finish-off-network') {
+      return OFF_NETWORK_MESSAGE
+    }
+    if (error.code === 'no-route') return 'No route connects these two points.'
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
+function routeFeatures(route: Route | null) {
+  return {
+    line: {
+      type: 'FeatureCollection' as const,
+      features: route
+        ? [
+            {
+              type: 'Feature' as const,
+              properties: {},
+              geometry: { type: 'LineString' as const, coordinates: route.coords },
+            },
+          ]
+        : [],
+    },
+    locks: {
+      type: 'FeatureCollection' as const,
+      features: (route?.locks ?? []).map((lock, index) => ({
+        type: 'Feature' as const,
+        properties: { name: lock.name, order: index + 1 },
+        geometry: { type: 'Point' as const, coordinates: lock.coord },
+      })),
+    },
+  }
+}
 
 type GraphNode = {
   id: string | number
@@ -24,6 +91,7 @@ type GraphEdge = {
   b: string | number
   lengthM: number
   lock: boolean
+  lockName?: string
   name?: string
   way: string | number
   coords: [number, number][]
@@ -104,7 +172,7 @@ const edgeFeatures = graph.edges
     type: 'Feature' as const,
     properties: {
       id: edge.id,
-      name: edge.name ?? 'Unnamed waterway',
+      name: edge.lockName ?? edge.name ?? 'Unnamed waterway',
       lock: edge.lock,
       lengthM: edge.lengthM,
       way: edge.way,
@@ -184,9 +252,37 @@ const graphCounts = {
 function App() {
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
+  const panelRef = useRef<HTMLElement>(null)
   const [showNodes, setShowNodes] = useState(true)
   const [showBridges, setShowBridges] = useState(false)
   const [showBoundary, setShowBoundary] = useState(true)
+  const [mapReady, setMapReady] = useState(false)
+  const [lockSpeed, setLockSpeed] = useState<LockSpeed>('medium')
+  const [start, setStart] = useState<LonLat | null>(null)
+  const [finish, setFinish] = useState<LonLat | null>(null)
+  const [picking, setPicking] = useState<PickTarget | null>(null)
+  const [pickError, setPickError] = useState<string | null>(null)
+  const pickingRef = useRef<PickTarget | null>(null)
+  const markersRef = useRef<{ start: Marker | null; finish: Marker | null }>({
+    start: null,
+    finish: null,
+  })
+  const fittedRouteKey = useRef<string | null>(null)
+
+  const beginPicking = (target: PickTarget | null) => {
+    pickingRef.current = target
+    setPicking(target)
+  }
+
+  const routeResult = useMemo(() => {
+    if (!start || !finish) return null
+    try {
+      return { route: findRoute(graph, start, finish, { lockSpeed }), error: null }
+    } catch (error) {
+      return { route: null, error: routeErrorMessage(error) }
+    }
+  }, [start, finish, lockSpeed])
+  const route = routeResult?.route ?? null
 
   useEffect(() => {
     if (!mapContainer.current) return
@@ -268,6 +364,30 @@ function App() {
           'line-cap': 'round',
           'line-join': 'round',
         },
+      })
+
+      const emptyRoute = routeFeatures(null)
+      map.addSource('route-line', { type: 'geojson', data: emptyRoute.line })
+      map.addLayer({
+        id: 'route-casing',
+        type: 'line',
+        source: 'route-line',
+        paint: {
+          'line-color': '#fff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 13, 13],
+          'line-opacity': 0.95,
+        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+      })
+      map.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route-line',
+        paint: {
+          'line-color': '#1c4fd6',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 13, 8],
+        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
 
       map.addSource('graph-nodes', {
@@ -373,9 +493,33 @@ function App() {
         },
       })
 
+      map.addSource('route-locks', { type: 'geojson', data: emptyRoute.locks })
+      map.addLayer({
+        id: 'route-locks',
+        type: 'circle',
+        source: 'route-locks',
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#d94f30',
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': 2.5,
+        },
+      })
+
       const popup = new Popup({ closeButton: true, closeOnClick: true })
+      map.on('click', 'route-locks', (event) => {
+        const properties = event.features?.[0]?.properties as FeatureProperties | undefined
+        if (pickingRef.current || !properties) return
+        popup
+          .setLngLat(event.lngLat)
+          .setHTML(
+            `<strong>${escapeHtml(String(properties.name))}</strong><br>Lock ${escapeHtml(String(properties.order))} on route`,
+          )
+          .addTo(map)
+      })
       for (const layer of ['graph-edges', 'graph-nodes', 'graph-bridges']) {
         map.on('click', layer, (event) => {
+          if (pickingRef.current) return
           const feature = event.features?.[0]
           if (!feature) return
           const properties = feature.properties as FeatureProperties | null
@@ -405,28 +549,170 @@ function App() {
             )
             .addTo(map)
         })
+      }
+      for (const layer of ['graph-edges', 'graph-nodes', 'graph-bridges', 'route-locks']) {
         map.on('mouseenter', layer, () => {
-          map.getCanvas().style.cursor = 'pointer'
+          if (!pickingRef.current) map.getCanvas().style.cursor = 'pointer'
         })
         map.on('mouseleave', layer, () => {
           map.getCanvas().style.cursor = ''
         })
       }
 
+      // Registered after the layer handlers so they still see picking mode on the
+      // click that sets the finish, and skip their popups.
+      map.on('click', (event) => {
+        const target = pickingRef.current
+        if (!target) return
+        const snapped = snapToNetwork(graph, [event.lngLat.lng, event.lngLat.lat])
+        if (!snapped) {
+          setPickError(OFF_NETWORK_MESSAGE)
+          return
+        }
+        setPickError(null)
+        if (target === 'start') {
+          setStart(snapped.coord)
+          pickingRef.current = 'finish'
+          setPicking('finish')
+        } else {
+          setFinish(snapped.coord)
+          pickingRef.current = null
+          setPicking(null)
+        }
+      })
+
       map.fitBounds(
         routeBounds,
         { padding: 48 },
       )
+      setMapReady(true)
     })
+
 
     map.on('error', (event) => console.error('MapLibre error:', event.error))
     map.addControl(new NavigationControl(), 'top-right')
 
+    const markers = markersRef.current
     return () => {
+      markers.start?.remove()
+      markers.finish?.remove()
+      markers.start = null
+      markers.finish = null
       mapRef.current = null
+      setMapReady(false)
       map.remove()
     }
   }, [])
+
+  // Keep the start and finish markers in sync with state. Dragging a marker
+  // snaps it back onto the canal, or back to where it was if it's too far away.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const sync = (
+      target: PickTarget,
+      point: LonLat | null,
+      setPoint: (update: (current: LonLat | null) => LonLat | null) => void,
+    ) => {
+      const markers = markersRef.current
+      if (!point) {
+        markers[target]?.remove()
+        markers[target] = null
+        return
+      }
+      let marker = markers[target]
+      if (!marker) {
+        marker = new Marker({
+          color: target === 'start' ? '#26834a' : '#9c3151',
+          draggable: true,
+        })
+          .setLngLat(point)
+          .addTo(map)
+        marker.getElement().setAttribute('aria-label', `Route ${target}`)
+        const created = marker
+        marker.on('dragend', () => {
+          const { lng, lat } = created.getLngLat()
+          const snapped = snapToNetwork(graph, [lng, lat])
+          if (!snapped) {
+            setPickError(OFF_NETWORK_MESSAGE)
+            setPoint((current) => (current ? [current[0], current[1]] : current))
+            return
+          }
+          setPickError(null)
+          setPoint(() => snapped.coord)
+        })
+        markers[target] = marker
+      }
+      marker.setLngLat(point)
+    }
+
+    sync('start', start, setStart)
+    sync('finish', finish, setFinish)
+  }, [start, finish, mapReady])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const features = routeFeatures(route)
+    ;(map.getSource('route-line') as GeoJSONSource | undefined)?.setData(features.line)
+    ;(map.getSource('route-locks') as GeoJSONSource | undefined)?.setData(features.locks)
+
+    // Zoom to a route when its end points change, not when only the pace does.
+    const key = route && start && finish ? `${start}|${finish}` : null
+    if (route && key !== fittedRouteKey.current) {
+      const bounds = route.coords.reduce(
+        (box, coord) => box.extend(coord),
+        new LngLatBounds(route.coords[0], route.coords[0]),
+      )
+      // Keep the route clear of the panel: beside it on wide screens, below it
+      // when it spans the width of a phone.
+      const panel = panelRef.current?.getBoundingClientRect()
+      const container = map.getContainer().getBoundingClientRect()
+      const padding = { top: 48, bottom: 48, left: 48, right: 48 }
+      if (panel && panel.right > container.width * 0.6) {
+        padding.top = Math.min(panel.bottom + 24, container.height * 0.7)
+        padding.left = 24
+        padding.right = 24
+        padding.bottom = 24
+      } else if (panel) {
+        padding.left = panel.right + 32
+      }
+      map.fitBounds(bounds, { padding, maxZoom: 15 })
+    }
+    fittedRouteKey.current = key
+  }, [route, start, finish, mapReady])
+
+  useEffect(() => {
+    if (!picking) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        pickingRef.current = null
+        setPicking(null)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [picking])
+
+  const clearRoute = () => {
+    beginPicking(null)
+    setStart(null)
+    setFinish(null)
+    setPickError(null)
+  }
+
+  const togglePicking = () => {
+    setPickError(null)
+    if (picking) {
+      beginPicking(null)
+      return
+    }
+    setStart(null)
+    setFinish(null)
+    beginPicking('start')
+  }
 
   useEffect(() => {
     const map = mapRef.current
@@ -467,8 +753,12 @@ function App() {
 
   return (
     <main className="map-shell">
-      <div className="map" ref={mapContainer} aria-label="London canal graph map" />
-      <section className="map-panel" aria-label="Graph map controls">
+      <div
+        className={`map${picking ? ' is-picking' : ''}`}
+        ref={mapContainer}
+        aria-label="London canal graph map"
+      />
+      <section className="map-panel" aria-label="Graph map controls" ref={panelRef}>
         <div className="map-panel-heading">
           <div>
             <p className="eyebrow">Windlass v1.0</p>
@@ -485,6 +775,92 @@ function App() {
         <p className="map-summary">
           {graph.edges.length} canal sections · {graph.nodes.length} graph nodes
         </p>
+        <section className="route-planner" aria-label="Route planner">
+          <div className="route-planner-heading">
+            <h2>Plan a route</h2>
+            {(start || finish) && (
+              <button className="text-button" onClick={clearRoute} type="button">
+                Clear
+              </button>
+            )}
+          </div>
+          <fieldset className="lock-pace">
+            <legend>Lock working</legend>
+            {LOCK_SPEEDS.map(({ value, label }) => (
+              <label key={value} className={lockSpeed === value ? 'is-selected' : ''}>
+                <input
+                  checked={lockSpeed === value}
+                  name="lock-pace"
+                  onChange={() => setLockSpeed(value)}
+                  type="radio"
+                  value={value}
+                />
+                <span>{label}</span>
+                <small>{LOCK_MINUTES[value]} min/lock</small>
+              </label>
+            ))}
+          </fieldset>
+          <button
+            className={`plan-button${picking ? ' is-active' : ''}`}
+            onClick={togglePicking}
+            type="button"
+          >
+            {picking ? 'Cancel' : start && finish ? 'Pick new points' : 'Pick start and finish'}
+          </button>
+          {picking && (
+            <p className="route-hint">
+              Click the map to set the <strong>{picking}</strong>. Press Esc to cancel.
+            </p>
+          )}
+          {pickError && (
+            <p className="route-error" role="alert">
+              {pickError}
+            </p>
+          )}
+          {routeResult?.error && (
+            <p className="route-error" role="alert">
+              {routeResult.error}
+            </p>
+          )}
+          {route && (
+            <div className="route-summary" aria-live="polite">
+              <p className="route-total">
+                {formatDuration(route.totalMinutes)}
+                <span> fastest at {lockSpeed} lock working</span>
+              </p>
+              <dl className="route-stats">
+                <div>
+                  <dt>Distance</dt>
+                  <dd>{(route.distanceM / 1000).toFixed(1)} km</dd>
+                </div>
+                <div>
+                  <dt>Cruising</dt>
+                  <dd>{formatDuration(route.cruiseMinutes)}</dd>
+                </div>
+                <div>
+                  <dt>Locks</dt>
+                  <dd>
+                    {route.locks.length}
+                    {route.locks.length > 0 && <small>{formatDuration(route.lockMinutes)}</small>}
+                  </dd>
+                </div>
+              </dl>
+              {route.locks.length > 0 && (
+                <details className="route-locks">
+                  <summary>Locks in order</summary>
+                  <ol>
+                    {route.locks.map((lock, index) => (
+                      <li key={`${index}-${lock.name}`}>{lock.name}</li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+              <p className="route-note">
+                Drag the markers to adjust. Cruising at {DEFAULT_SPEED_KMH} km/h (4 mph).
+              </p>
+            </div>
+          )}
+        </section>
         <button
           className="fit-route-button"
           onClick={() => mapRef.current?.fitBounds(routeBounds, { padding: 48 })}
