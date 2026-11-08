@@ -3,6 +3,15 @@ const ROUTE_WATERWAY_NAME =
 const ANCHOR_NAME = /packet boat marina|pickett.?s lock|alfie.?s lock/i
 const EXCLUDED_LOCK_NAME = /thames|limehouse basin lock|bow creek|prescott/i
 const SCOPE_LIMIT_LOCK_NAME = /uxbridge lock|pickett.?s lock|alfie.?s lock/i
+const CRT_LOCK_CHAMBER = '010'
+const CRT_MATCH_M = 40
+// CRT lock chambers beside the route that are deliberately left out (SCOPE.md).
+const OUT_OF_SCOPE_CRT_LOCKS = new Map([
+  ['LN-001-003', 'Bow Locks lead to tidal Bow Creek'],
+  ['LN-001-004', 'Bow Locks lead to tidal Bow Creek'],
+  ['LB-001-007', 'Limehouse Ship Lock leads to the tidal Thames'],
+])
+const MARINA_ROUTE_M = 150
 const EARTH_RADIUS_M = 6_371_008.8
 
 export function haversineM([lon1, lat1], [lon2, lat2]) {
@@ -35,6 +44,18 @@ function lockNameOf(way) {
   return /lock/i.test(tags.lock_ref ?? '') ? tags.lock_ref : undefined
 }
 
+function isLockWay(way) {
+  return way.tags?.lock === 'yes' || way.tags?.waterway === 'lock'
+}
+
+function isExcludedLock(way) {
+  return (
+    isLockWay(way) &&
+    (EXCLUDED_LOCK_NAME.test(way.tags?.name ?? '') ||
+      EXCLUDED_LOCK_NAME.test(way.tags?.lock_name ?? ''))
+  )
+}
+
 function isNavigable(way) {
   return way.tags?.boat !== 'no' && way.tags?.motorboat !== 'no'
 }
@@ -44,6 +65,7 @@ function isRouteWaterway(way) {
   const name = way.tags?.name ?? ''
   return (
     isNavigable(way) &&
+    !isExcludedLock(way) &&
     ['canal', 'river'].includes(waterway) &&
     ROUTE_WATERWAY_NAME.test(name) &&
     (!/^river lee$/i.test(name) || waterway === 'canal')
@@ -186,7 +208,132 @@ function countComponents(edges) {
   return components
 }
 
-export function buildGraph(raw) {
+/** Shortest distance from a point to any edge, using a local flat projection. */
+function distanceToEdgesM(point, edges) {
+  const kx = Math.cos((point[1] * Math.PI) / 180)
+  let best = Infinity
+  for (const edge of edges) {
+    for (let i = 1; i < edge.coords.length; i += 1) {
+      const a = edge.coords[i - 1]
+      const b = edge.coords[i]
+      const abX = (b[0] - a[0]) * kx
+      const abY = b[1] - a[1]
+      const lengthSq = abX * abX + abY * abY
+      const t =
+        lengthSq === 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(1, (((point[0] - a[0]) * kx) * abX + (point[1] - a[1]) * abY) / lengthSq),
+            )
+      best = Math.min(
+        best,
+        haversineM(point, [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]),
+      )
+    }
+  }
+  return best
+}
+
+/** "Lock 17, Tottenham Lock, Eastern Side" -> { number: '17', name: 'Tottenham Lock' } */
+export function parseCrtLockName(description) {
+  const text = (description ?? '').trim()
+  const match = /^Lock\s+(\d+[A-Z]?)\s*,\s*(.+)$/i.exec(text)
+  if (!match) return { number: null, name: text }
+  return { number: match[1], name: match[2].replace(/,\s*[^,]*\bside$/i, '').trim() }
+}
+
+/** CRT drops apostrophes ("Actons Lock"); borrow them back from the OSM name. */
+function restoreApostrophes(crtName, osmName) {
+  const osmWords = (osmName ?? '').split(/\s+/).filter((word) => /['’]/.test(word))
+  return crtName
+    .split(/\s+/)
+    .map(
+      (word) =>
+        osmWords.find(
+          (osmWord) =>
+            osmWord.replace(/['’]/g, '').toLowerCase() === word.toLowerCase(),
+        )?.replace('’', "'") ?? word,
+    )
+    .join(' ')
+}
+
+/**
+ * Match lock edges to CRT lock chambers, closest pairs first, so twin chambers
+ * pair up one to one. Matched edges take the CRT name, number and asset id.
+ */
+function applyCrtLocks(edges, crtLocks) {
+  const chambers = (crtLocks?.features ?? []).filter(
+    (feature) =>
+      feature.properties?.sap_object_type === CRT_LOCK_CHAMBER &&
+      feature.geometry?.type === 'Point',
+  )
+  const lockEdges = edges.filter((edge) => edge.lock)
+  const pairs = []
+  for (const edge of lockEdges) {
+    const midpoint = edge.coords[Math.floor(edge.coords.length / 2)]
+    for (const chamber of chambers) {
+      const distanceM = haversineM(midpoint, chamber.geometry.coordinates)
+      if (distanceM <= CRT_MATCH_M) pairs.push({ edge, chamber, distanceM })
+    }
+  }
+  pairs.sort((a, b) => a.distanceM - b.distanceM)
+
+  const matchedEdges = new Set()
+  const matchedChambers = new Set()
+  for (const { edge, chamber } of pairs) {
+    if (matchedEdges.has(edge) || matchedChambers.has(chamber)) continue
+    matchedEdges.add(edge)
+    matchedChambers.add(chamber)
+    const { number, name } = parseCrtLockName(chamber.properties.sap_description)
+    edge.lockName = restoreApostrophes(name, edge.lockName ?? edge.name)
+    if (number) edge.lockNumber = number
+    edge.crtId = chamber.properties.sap_func_loc
+    edge.waterwayName = chamber.properties.waterway_name
+  }
+
+  const missing = []
+  const outOfScope = []
+  for (const chamber of chambers) {
+    if (matchedChambers.has(chamber)) continue
+    if (distanceToEdgesM(chamber.geometry.coordinates, edges) > CRT_MATCH_M) continue
+    const entry = {
+      crtId: chamber.properties.sap_func_loc,
+      description: chamber.properties.sap_description,
+      waterway: chamber.properties.waterway_name,
+    }
+    const reason = OUT_OF_SCOPE_CRT_LOCKS.get(entry.crtId)
+    if (reason) outOfScope.push({ ...entry, reason })
+    else missing.push(entry)
+  }
+
+  return {
+    matched: matchedEdges.size,
+    lockEdges: lockEdges.length,
+    unmatchedGraphLocks: lockEdges
+      .filter((edge) => !matchedEdges.has(edge))
+      .map((edge) => ({ id: edge.id, name: edge.lockName ?? edge.name ?? null })),
+    missingCrtLocks: missing,
+    outOfScopeCrtLocks: outOfScope,
+  }
+}
+
+function collectMarinas(elements, edges) {
+  return elements
+    .filter((element) => element.tags?.leisure === 'marina' && element.tags?.name)
+    .flatMap((element) => {
+      const coords = geometryCoordinates(element)
+      if (coords.length === 0) return []
+      const nearestM = Math.min(...coords.map((point) => distanceToEdgesM(point, edges)))
+      if (nearestM > MARINA_ROUTE_M) return []
+      const lon = coords.reduce((sum, point) => sum + point[0], 0) / coords.length
+      const lat = coords.reduce((sum, point) => sum + point[1], 0) / coords.length
+      return [{ id: `${element.type}/${element.id}`, name: element.tags.name, lon, lat }]
+    })
+    .sort((a, b) => a.lon - b.lon)
+}
+
+export function buildGraph(raw, { crtLocks = null } = {}) {
   if (!Array.isArray(raw.elements)) {
     throw new Error('OSM snapshot must contain an elements array')
   }
@@ -201,9 +348,9 @@ export function buildGraph(raw) {
   )
   const lockWays = allWaterways.filter(
     (way) =>
-      (way.tags?.lock === 'yes' || way.tags?.waterway === 'lock') &&
+      isLockWay(way) &&
       isNavigable(way) &&
-      !EXCLUDED_LOCK_NAME.test(way.tags?.name ?? '') &&
+      !isExcludedLock(way) &&
       (way.nodes ?? []).some((id) => routeNodeIds.has(String(id))),
   )
   const lockGateWays = allWaterways.filter(
@@ -401,6 +548,19 @@ export function buildGraph(raw) {
     }
   }
 
+  // Exclusions can leave stubs cut off from the route (such as the Thames side
+  // of Limehouse Ship Lock). Keep the endpoints' network and report the rest.
+  let droppedEdges = []
+  if (start && finish) {
+    const routeComponent = reachableFrom(routeEdges, start.vertexId)
+    if (routeComponent.has(finish.vertexId)) {
+      droppedEdges = routeEdges.filter((edge) => !routeComponent.has(edge.a))
+      routeEdges = routeEdges.filter((edge) => routeComponent.has(edge.a))
+    }
+  }
+
+  const crt = crtLocks ? applyCrtLocks(routeEdges, crtLocks) : null
+
   const degree = new Map()
   for (const edge of routeEdges) {
     degree.set(edge.a, (degree.get(edge.a) ?? 0) + 1)
@@ -506,6 +666,7 @@ export function buildGraph(raw) {
       componentCount,
       gap,
       offLineWindings,
+      marinas: collectMarinas(elements, routeEdges),
     },
     summary: {
       rawWaterwayWays: allWaterways.length,
@@ -527,6 +688,12 @@ export function buildGraph(raw) {
         0,
       ),
       offLineWindingCount: offLineWindings.length,
+      droppedEdges: droppedEdges.map((edge) => ({
+        id: edge.id,
+        name: edge.name ?? null,
+        lengthM: edge.lengthM,
+      })),
+      crt,
       start,
       finish,
       connected,

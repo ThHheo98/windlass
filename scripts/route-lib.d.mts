@@ -8,6 +8,9 @@ export type RouteEdge = {
   lengthM: number
   lock: boolean
   lockName?: string
+  lockNumber?: string
+  waterwayName?: string
+  crtId?: string
   name?: string
   coords: LonLat[]
 }
@@ -30,7 +33,13 @@ export type Route = {
   lockMinutes: number
   totalMinutes: number
   lockSpeed: LockSpeed
-  locks: { name: string; coord: LonLat; atM: number }[]
+  locks: {
+    name: string
+    number: string | null
+    waterway: string | null
+    coord: LonLat
+    atM: number
+  }[]
   start: { coord: LonLat; distanceM: number; edgeName?: string }
   finish: { coord: LonLat; distanceM: number; edgeName?: string }
 }

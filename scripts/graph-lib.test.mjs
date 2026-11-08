@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildGraph, haversineM } from './graph-lib.mjs'
+import { buildGraph, haversineM, parseCrtLockName } from './graph-lib.mjs'
 
 function makeSnapshot() {
   const node = (id, lon, lat, tags = {}) => ({
@@ -227,4 +227,103 @@ test('buildGraph keeps Uxbridge Lock and trims the main line beyond it', () => {
   assert.ok(!graph.edges.some((edge) => [62, 64, 66].includes(edge.way)))
   assert.equal(graph.nodes.find((node) => node.id === 61)?.type, 'lock')
   assert.equal(summary.connected, true)
+})
+
+test('parseCrtLockName splits the number and drops the chamber side', () => {
+  assert.deepEqual(parseCrtLockName('Lock 17, Tottenham Lock, Eastern Side'), {
+    number: '17',
+    name: 'Tottenham Lock',
+  })
+  assert.deepEqual(parseCrtLockName('Lock 1B, Hampstead Road Lock'), {
+    number: '1B',
+    name: 'Hampstead Road Lock',
+  })
+  assert.deepEqual(parseCrtLockName('West India Dock Entrance Lock'), {
+    number: null,
+    name: 'West India Dock Entrance Lock',
+  })
+})
+
+function crtLock(id, description, coordinates, type = '010') {
+  return {
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates },
+    properties: {
+      sap_func_loc: id,
+      sap_description: description,
+      sap_object_type: type,
+      waterway_name: 'Grand Union Canal',
+    },
+  }
+}
+
+test('buildGraph names locks from CRT data and reports mismatches', () => {
+  const raw = makeSnapshot()
+  const lockWay = raw.elements.find((element) => element.id === 13)
+  lockWay.tags.lock_name = "Smith's Lock"
+  const crtLocks = {
+    type: 'FeatureCollection',
+    features: [
+      crtLock('GU-001-001', 'Lock 7, Smiths Lock', [0.00425, 0.00005]),
+      crtLock('GU-001-002', 'Lock 7 Bypass Weir, Smiths Lock', [0.00425, 0], '018'),
+      crtLock('GU-001-003', 'Lock 8, Mystery Lock', [0.0015, 0]),
+      crtLock('GU-009-001', 'Lock 99, Far Away Lock', [0.5, 0.5]),
+    ],
+  }
+
+  const { graph, summary } = buildGraph(raw, { crtLocks })
+  const lockEdge = graph.edges.find((edge) => edge.way === 13)
+  assert.equal(lockEdge.lockName, "Smith's Lock")
+  assert.equal(lockEdge.lockNumber, '7')
+  assert.equal(lockEdge.crtId, 'GU-001-001')
+  assert.equal(lockEdge.waterwayName, 'Grand Union Canal')
+  assert.equal(summary.crt.matched, 1)
+  assert.deepEqual(summary.crt.unmatchedGraphLocks, [])
+  assert.deepEqual(
+    summary.crt.missingCrtLocks.map((lock) => lock.crtId),
+    ['GU-001-003'],
+  )
+})
+
+test('buildGraph excludes tidal locks by lock_name and drops the cut-off stub', () => {
+  const raw = makeSnapshot()
+  raw.elements.push(
+    {
+      type: 'way',
+      id: 70,
+      nodes: [5, 71],
+      geometry: [
+        { lon: 0.003, lat: 0.001 },
+        { lon: 0.003, lat: 0.0015 },
+      ],
+      tags: { name: "Regent's Canal", waterway: 'canal', lock: 'yes', lock_name: 'Limehouse Basin Lock' },
+    },
+    {
+      type: 'way',
+      id: 72,
+      nodes: [71, 73],
+      geometry: [
+        { lon: 0.003, lat: 0.0015 },
+        { lon: 0.003, lat: 0.003 },
+      ],
+      tags: { name: "Regent's Canal", waterway: 'canal' },
+    },
+  )
+
+  const { graph, summary } = buildGraph(raw)
+  assert.ok(!graph.edges.some((edge) => edge.way === 70 || edge.way === 72))
+  assert.deepEqual(summary.droppedEdges.map((edge) => edge.id), ['72:0-1'])
+  assert.equal(summary.componentCount, 1)
+})
+
+test('buildGraph lists named marinas beside the route', () => {
+  const raw = makeSnapshot()
+  raw.elements.push(
+    { type: 'node', id: 80, lon: 0.002, lat: 0.0005, tags: { leisure: 'marina', name: 'Canalside Marina' } },
+    { type: 'node', id: 81, lon: 0.002, lat: 0.05, tags: { leisure: 'marina', name: 'Far Marina' } },
+    { type: 'node', id: 82, lon: 0.001, lat: 0.0003, tags: { leisure: 'marina' } },
+  )
+
+  const { graph } = buildGraph(raw)
+  assert.deepEqual(graph.marinas.map((marina) => marina.name), ['Canalside Marina'])
 })

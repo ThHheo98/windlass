@@ -17,17 +17,23 @@ npm run dev
 
 ## Build the OpenStreetMap graph
 
-Fetch the OSM snapshot for the region polygon, then build and check the graph:
+Fetch the OSM snapshot and the Canal & River Trust lock data for the region
+polygon, then build and check the graph:
 
 ```sh
 npm run osm:fetch
+npm run crt:fetch
 npm run graph
 ```
 
 `osm:fetch` reads `data/region/london-mvp.geojson` and writes the full Overpass
 response to `data/osm/raw.json`. It includes waterway ways, lock and winding
-features, bridge ways, and the named start and finish landmarks. Set
+features, bridge ways, marinas, and the named start and finish landmarks. Set
 `OVERPASS_URL` to use a specific Overpass API endpoint.
+
+`crt:fetch` downloads the locks inside the region's bounding box from the
+[Canal & River Trust open data portal](https://data-canalrivertrust.opendata.arcgis.com)
+(`Canal_And_River_Trust_Locks_View`) and writes them to `data/crt/locks.geojson`.
 
 `graph` reads that snapshot, keeps named canal and Lee waterway ways that match
 the route in `SCOPE.md`, splits them into typed nodes and edges, measures edge
@@ -39,14 +45,31 @@ It trims the route at the two ends of the scope, keeping Uxbridge Lock and
 Pickett's Lock themselves but dropping the waterway beyond them (Denham Deep Lock
 and the Lee above Pickett's). Waterways tagged `boat=no` or `motorboat=no`, such
 as the disused chamber beside Acton's Lock, are left out so routes cannot bypass
-a lock. Each lock edge keeps its OSM `lock_name` (or a `lock_ref` that names it).
+a lock. Locks are also excluded by their OSM `lock_name`, which keeps out
+Limehouse Ship Lock (to the tidal Thames) and Thames Lock at Brentford. Any
+pieces left cut off from the route by these exclusions are dropped and listed
+by name, so a real mapping gap is still visible.
+
+When `data/crt/locks.geojson` is present, `graph` cross-checks every lock
+against it. Each lock edge is matched to the nearest CRT lock chamber within
+40 m, closest pairs first, so twin chambers pair up one to one. Matched edges
+take the CRT name, lock number (such as `1A`), waterway and asset id
+(`sap_func_loc`). CRT drops apostrophes (`Actons Lock`), so these are restored
+from the OSM name. The build fails if a graph lock has no CRT match or if a
+CRT lock chamber on the route is missing from the graph. Bow Locks and
+Limehouse Ship Lock are listed as deliberately out of scope. Named OSM marinas
+within 150 m of the route are written to `graph.json` for the map.
+
 It also reports the number of graph components; more than one means there are
 disconnected mapped sections to inspect. If the endpoint check fails, it reports
 missing anchors or the closest vertices across the gap.
 
-The map displays the generated graph, with toggles for graph nodes, bridge
-crossings, and the region boundary. Use “Show full route” to fit the canal
-network in view, and click a graph feature to inspect its OSM details.
+The map draws the waterways with symbols for features: a lock chamber turned
+to lie along the canal (labelled with its CRT number and name from zoom 13),
+junctions, winding holes, marinas (an anchor) and bridges. Toggles show or hide
+locks and other features, bridges, marinas and the region boundary. Use “Show
+full route” to fit the canal network in view, and click a symbol or line for
+its details; a lock shows its waterway and CRT asset id.
 
 To plan a trip, choose a lock working pace (slow, medium or fast), press “Pick
 start and finish”, then click the map twice. Each click snaps to the nearest
@@ -56,7 +79,10 @@ and lock time, plus the locks in order. Drag either marker to adjust the route;
 changing the pace recalculates it straight away. Press Esc to cancel picking.
 
 Raw OSM data is made available under the Open Database License (ODbL); the
-snapshot includes the attribution returned by OpenStreetMap.
+snapshot includes the attribution returned by OpenStreetMap. Lock data is
+© Canal & River Trust copyright and database rights reserved, and © Crown
+copyright and database rights, Ordnance Survey 100022432, used under the
+[CRT data licence](https://canalrivertrust.org.uk/refresh/media/thumbnail/26503-CRT-Data-Licence.pdf).
 
 ## Routing
 

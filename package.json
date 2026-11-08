@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "osm:fetch": "node scripts/osm-fetch.mjs",
+    "crt:fetch": "node scripts/crt-fetch.mjs",
     "graph": "node scripts/graph.mjs",
     "test": "node --test scripts/*.test.mjs"
   },

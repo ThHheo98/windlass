@@ -22,6 +22,7 @@ import {
   type LonLat,
   type Route,
 } from '../scripts/route-lib.mjs'
+import { addMapIcons, iconSize, iconUrl, type IconName } from './mapIcons'
 import './App.css'
 
 type PickTarget = 'start' | 'finish'
@@ -92,6 +93,9 @@ type GraphEdge = {
   lengthM: number
   lock: boolean
   lockName?: string
+  lockNumber?: string
+  waterwayName?: string
+  crtId?: string
   name?: string
   way: string | number
   coords: [number, number][]
@@ -107,6 +111,7 @@ type GraphData = {
     start: { feature: string; vertexId: string | number } | null
     finish: { feature: string; vertexId: string | number } | null
   }
+  marinas: { id: string; name: string; lon: number; lat: number }[]
 }
 
 type FeatureProperties = Record<string, string | number | boolean | null>
@@ -183,6 +188,102 @@ const edgeFeatures = graph.edges
     },
   }))
 
+function featureCollection<T>(features: T[]) {
+  return { type: 'FeatureCollection' as const, features }
+}
+
+/** Compass bearing of an edge from its first to its last point, in degrees. */
+function edgeBearing(edge: GraphEdge) {
+  const [from, to] = [edge.coords[0], edge.coords.at(-1) ?? edge.coords[0]]
+  const dx = (to[0] - from[0]) * Math.cos((from[1] * Math.PI) / 180)
+  const dy = to[1] - from[1]
+  return (Math.atan2(dx, dy) * 180) / Math.PI
+}
+
+// One symbol per lock chamber, turned to lie along the canal. The icon is
+// drawn east-west (bearing 90), hence the offset.
+const lockFeatures = graph.edges
+  .filter((edge) => edge.lock)
+  .map((edge) => {
+    const name = edge.lockName ?? edge.name ?? 'Unnamed lock'
+    return {
+      type: 'Feature' as const,
+      properties: {
+        name,
+        number: edge.lockNumber ?? '',
+        label: edge.lockNumber ? `${edge.lockNumber} · ${name}` : name,
+        waterway: edge.waterwayName ?? '',
+        crtId: edge.crtId ?? '',
+        rotate: edgeBearing(edge) - 90,
+      },
+      geometry: {
+        type: 'Point' as const,
+        coordinates: pointAlongEdge(edge, edge.lengthM / 2),
+      },
+    }
+  })
+
+const marinaFeatures = (graph.marinas ?? []).map((marina) => ({
+  type: 'Feature' as const,
+  properties: { id: marina.id, name: marina.name },
+  geometry: { type: 'Point' as const, coordinates: [marina.lon, marina.lat] },
+}))
+
+const CLICKABLE_LAYERS = [
+  'graph-locks',
+  'marinas',
+  'graph-nodes',
+  'graph-ends',
+  'graph-bridges',
+  'graph-edges',
+] as const
+
+function describeFeature(
+  layer: (typeof CLICKABLE_LAYERS)[number],
+  properties: FeatureProperties,
+) {
+  const text = (key: string) => String(properties[key] ?? '')
+  switch (layer) {
+    case 'graph-locks':
+      return {
+        title: text('number') ? `Lock ${text('number')}: ${text('name')}` : text('name'),
+        details: [
+          text('waterway'),
+          text('crtId') ? `CRT asset ${text('crtId')}` : 'Not matched to CRT data',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }
+    case 'marinas':
+      return { title: text('name'), details: 'Marina' }
+    case 'graph-nodes':
+      return {
+        title: `${text('type') === 'winding' ? 'Winding hole' : 'Junction'}: ${text('name') || text('id')}`,
+        details: `OSM node ${text('id')}`,
+      }
+    case 'graph-ends':
+      return {
+        title: `End of navigation: ${text('name') || text('id')}`,
+        details: `OSM node ${text('id')}`,
+      }
+    case 'graph-bridges':
+      return {
+        title: `Bridge: ${text('name')}`,
+        details: `Crosses ${text('edge')}${properties.atM ? ` · ${Math.round(Number(properties.atM))} m along` : ''}`,
+      }
+    case 'graph-edges':
+      return {
+        title: text('name'),
+        details: `${(Number(properties.lengthM) / 1000).toFixed(2)} km${properties.lock ? ' · lock chamber' : ''}`,
+      }
+  }
+}
+
+function LegendIcon({ name }: { name: IconName }) {
+  const { width, height } = iconSize(name)
+  return <img alt="" className="legend-icon" height={height} src={iconUrl(name)} width={width} />
+}
+
 const nodeFeatures = graph.nodes.map((node) => ({
   type: 'Feature' as const,
   properties: {
@@ -256,6 +357,7 @@ function App() {
   const [showNodes, setShowNodes] = useState(true)
   const [showBridges, setShowBridges] = useState(false)
   const [showBoundary, setShowBoundary] = useState(true)
+  const [showMarinas, setShowMarinas] = useState(true)
   const [mapReady, setMapReady] = useState(false)
   const [lockSpeed, setLockSpeed] = useState<LockSpeed>('medium')
   const [start, setStart] = useState<LonLat | null>(null)
@@ -297,7 +399,8 @@ function App() {
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
+            attribution:
+              '&copy; OpenStreetMap contributors · Lock data &copy; Canal &amp; River Trust',
           },
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
@@ -307,7 +410,11 @@ function App() {
     })
     mapRef.current = map
 
-    map.on('load', () => {
+    map.on('load', async () => {
+      await addMapIcons(map)
+      // React StrictMode may have torn this map down while the icons loaded.
+      if (mapRef.current !== map) return
+
       map.addSource('region-boundary', { type: 'geojson', data: boundary })
       map.addLayer({
         id: 'region-fill',
@@ -331,39 +438,17 @@ function App() {
         layout: { visibility: 'visible' },
       })
 
-      map.addSource('graph-edges', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: edgeFeatures,
-        },
-      })
+      map.addSource('graph-edges', { type: 'geojson', data: featureCollection(edgeFeatures) })
       map.addLayer({
         id: 'graph-edges',
         type: 'line',
         source: 'graph-edges',
         paint: {
-          'line-color': [
-            'case',
-            ['boolean', ['get', 'lock'], false],
-            '#dd5e32',
-            '#006d77',
-          ],
-          'line-width': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            8,
-            2,
-            13,
-            5,
-          ],
+          'line-color': '#006d77',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2, 13, 5],
           'line-opacity': 0.92,
         },
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
 
       const emptyRoute = routeFeatures(null)
@@ -390,91 +475,109 @@ function App() {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
 
-      map.addSource('graph-nodes', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: nodeFeatures,
+      // A blue ring under each lock symbol the route passes through.
+      map.addSource('route-locks', { type: 'geojson', data: emptyRoute.locks })
+      map.addLayer({
+        id: 'route-locks',
+        type: 'circle',
+        source: 'route-locks',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 9, 14, 15],
+          'circle-color': 'rgba(28, 79, 214, 0.18)',
+          'circle-stroke-color': '#1c4fd6',
+          'circle-stroke-width': 2.5,
         },
       })
+
+      map.addSource('graph-nodes', { type: 'geojson', data: featureCollection(nodeFeatures) })
       map.addLayer({
-        id: 'graph-nodes',
+        id: 'graph-ends',
         type: 'circle',
         source: 'graph-nodes',
-        filter: ['!=', ['get', 'type'], 'join'],
+        filter: ['==', ['get', 'type'], 'end'],
         paint: {
-          'circle-radius': [
-            'match',
-            ['get', 'type'],
-            'lock',
-            5,
-            'junction',
-            6,
-            'winding',
-            5,
-            4,
-          ],
-          'circle-color': [
-            'match',
-            ['get', 'type'],
-            'lock',
-            '#d94f30',
-            'junction',
-            '#7251a2',
-            'winding',
-            '#d18b00',
-            '#172a3a',
-          ],
+          'circle-radius': 4,
+          'circle-color': '#172a3a',
           'circle-stroke-color': '#fff',
           'circle-stroke-width': 1.5,
         },
-        layout: { visibility: 'visible' },
       })
 
-      map.addSource('graph-bridges', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: bridgeFeatures,
-        },
-      })
+      map.addSource('graph-bridges', { type: 'geojson', data: featureCollection(bridgeFeatures) })
       map.addLayer({
         id: 'graph-bridges',
-        type: 'circle',
+        type: 'symbol',
         source: 'graph-bridges',
-        paint: {
-          'circle-radius': 3.5,
-          'circle-color': '#f1c40f',
-          'circle-stroke-color': '#263238',
-          'circle-stroke-width': 1,
+        minzoom: 11,
+        layout: {
+          'icon-image': 'icon-bridge',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.7, 15, 1.1],
+          'icon-allow-overlap': true,
+          visibility: 'none',
         },
-        layout: { visibility: 'none' },
       })
 
-      map.addSource('graph-anchors', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: anchorFeatures,
-        },
-      })
       map.addLayer({
-        id: 'graph-anchors',
-        type: 'circle',
-        source: 'graph-anchors',
-        paint: {
-          'circle-radius': 8,
-          'circle-color': [
-            'match',
-            ['get', 'role'],
-            'Start',
-            '#26834a',
-            '#9c3151',
-          ],
-          'circle-stroke-color': '#fff',
-          'circle-stroke-width': 2,
+        id: 'graph-nodes',
+        type: 'symbol',
+        source: 'graph-nodes',
+        filter: ['in', ['get', 'type'], ['literal', ['junction', 'winding']]],
+        layout: {
+          'icon-image': ['concat', 'icon-', ['get', 'type']],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1.1],
+          'icon-allow-overlap': true,
         },
       })
+
+      map.addSource('graph-locks', { type: 'geojson', data: featureCollection(lockFeatures) })
+      map.addLayer({
+        id: 'graph-locks',
+        type: 'symbol',
+        source: 'graph-locks',
+        layout: {
+          'icon-image': 'icon-lock',
+          'icon-rotate': ['get', 'rotate'],
+          'icon-rotation-alignment': 'map',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 14, 1.2],
+          'icon-allow-overlap': true,
+          'text-field': ['step', ['zoom'], '', 13, ['get', 'label']],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.3],
+          'text-anchor': 'top',
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': '#7a2414',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.5,
+        },
+      })
+
+      map.addSource('marinas', { type: 'geojson', data: featureCollection(marinaFeatures) })
+      map.addLayer({
+        id: 'marinas',
+        type: 'symbol',
+        source: 'marinas',
+        layout: {
+          'icon-image': 'icon-marina',
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.75, 14, 1.15],
+          'icon-allow-overlap': true,
+          'text-field': ['step', ['zoom'], '', 12, ['get', 'name']],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': '#123d73',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.5,
+        },
+      })
+
+      map.addSource('graph-anchors', { type: 'geojson', data: featureCollection(anchorFeatures) })
       map.addLayer({
         id: 'graph-anchor-labels',
         type: 'symbol',
@@ -482,7 +585,7 @@ function App() {
         layout: {
           'text-field': ['get', 'name'],
           'text-size': 12,
-          'text-offset': [0, 1.5],
+          'text-offset': [0, 1.6],
           'text-anchor': 'top',
           'text-font': ['Noto Sans Regular'],
         },
@@ -493,64 +596,35 @@ function App() {
         },
       })
 
-      map.addSource('route-locks', { type: 'geojson', data: emptyRoute.locks })
-      map.addLayer({
-        id: 'route-locks',
-        type: 'circle',
-        source: 'route-locks',
-        paint: {
-          'circle-radius': 7,
-          'circle-color': '#d94f30',
-          'circle-stroke-color': '#fff',
-          'circle-stroke-width': 2.5,
-        },
-      })
-
-      const popup = new Popup({ closeButton: true, closeOnClick: true })
-      map.on('click', 'route-locks', (event) => {
-        const properties = event.features?.[0]?.properties as FeatureProperties | undefined
-        if (pickingRef.current || !properties) return
+      // One handler for every clickable layer, so only the top-most feature under
+      // the pointer (a lock symbol rather than the canal beneath it) opens a popup.
+      // The popup is closed here rather than with closeOnClick, whose own click
+      // listener would otherwise close a popup this handler has just reopened.
+      const popup = new Popup({ closeButton: true, closeOnClick: false })
+      const clickable = CLICKABLE_LAYERS.filter((layer) => map.getLayer(layer))
+      map.on('click', (event) => {
+        if (pickingRef.current) {
+          popup.remove()
+          return
+        }
+        const [feature] = map.queryRenderedFeatures(event.point, { layers: clickable })
+        const properties = feature?.properties as FeatureProperties | undefined
+        if (!feature || !properties) {
+          popup.remove()
+          return
+        }
+        const layer = feature.layer.id as (typeof CLICKABLE_LAYERS)[number]
+        const { title, details } = describeFeature(layer, properties)
+        const coordinates =
+          feature.geometry.type === 'Point'
+            ? (feature.geometry.coordinates as [number, number])
+            : event.lngLat
         popup
-          .setLngLat(event.lngLat)
-          .setHTML(
-            `<strong>${escapeHtml(String(properties.name))}</strong><br>Lock ${escapeHtml(String(properties.order))} on route`,
-          )
+          .setLngLat(coordinates)
+          .setHTML(`<strong>${escapeHtml(title)}</strong><br>${escapeHtml(details)}`)
           .addTo(map)
       })
-      for (const layer of ['graph-edges', 'graph-nodes', 'graph-bridges']) {
-        map.on('click', layer, (event) => {
-          if (pickingRef.current) return
-          const feature = event.features?.[0]
-          if (!feature) return
-          const properties = feature.properties as FeatureProperties | null
-          if (!properties) return
-          const coordinates =
-            layer === 'graph-edges'
-              ? event.lngLat
-              : (feature.geometry.type === 'Point'
-                  ? feature.geometry.coordinates
-                  : [event.lngLat.lng, event.lngLat.lat]) as [number, number]
-          const title =
-            layer === 'graph-nodes'
-              ? `${String(properties.type)}: ${String(properties.name || properties.id)}`
-              : layer === 'graph-bridges'
-                ? `Bridge: ${String(properties.name)}`
-                : String(properties.name)
-          const details =
-            layer === 'graph-edges'
-              ? `${(Number(properties.lengthM) / 1000).toFixed(2)} km${properties.lock ? ' · lock chamber' : ''}`
-              : layer === 'graph-bridges'
-                ? `Crosses ${String(properties.edge)}${properties.atM ? ` · ${Math.round(Number(properties.atM))} m along` : ''}`
-                : `OSM node ${String(properties.id)}`
-          popup
-            .setLngLat(coordinates)
-            .setHTML(
-              `<strong>${escapeHtml(title)}</strong><br>${escapeHtml(details)}`,
-            )
-            .addTo(map)
-        })
-      }
-      for (const layer of ['graph-edges', 'graph-nodes', 'graph-bridges', 'route-locks']) {
+      for (const layer of clickable) {
         map.on('mouseenter', layer, () => {
           if (!pickingRef.current) map.getCanvas().style.cursor = 'pointer'
         })
@@ -716,40 +790,22 @@ function App() {
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !mapReady) return
 
-    const updateVisibility = () => {
-      if (map.getLayer('graph-nodes')) {
-        map.setLayoutProperty(
-          'graph-nodes',
-          'visibility',
-          showNodes ? 'visible' : 'none',
-        )
-      }
-      if (map.getLayer('graph-bridges')) {
-        map.setLayoutProperty(
-          'graph-bridges',
-          'visibility',
-          showBridges ? 'visible' : 'none',
-        )
-      }
-      for (const layer of ['region-fill', 'region-outline']) {
+    const groups: [string[], boolean][] = [
+      [['graph-locks', 'graph-nodes', 'graph-ends'], showNodes],
+      [['graph-bridges'], showBridges],
+      [['marinas'], showMarinas],
+      [['region-fill', 'region-outline'], showBoundary],
+    ]
+    for (const [layers, visible] of groups) {
+      for (const layer of layers) {
         if (map.getLayer(layer)) {
-          map.setLayoutProperty(
-            layer,
-            'visibility',
-            showBoundary ? 'visible' : 'none',
-          )
+          map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none')
         }
       }
     }
-
-    if (map.getLayer('graph-nodes')) {
-      updateVisibility()
-    } else {
-      map.once('load', updateVisibility)
-    }
-  }, [showNodes, showBridges, showBoundary])
+  }, [showNodes, showBridges, showMarinas, showBoundary, mapReady])
 
   return (
     <main className="map-shell">
@@ -879,14 +935,18 @@ function App() {
             <span className="legend-line" />
             Waterways
           </label>
-          <label>
+          <label className="map-toggle-wide">
             <input
               checked={showNodes}
               onChange={(event) => setShowNodes(event.target.checked)}
               type="checkbox"
             />
-            <span className="legend-node" />
-            Locks &amp; junctions
+            <span className="legend-icons">
+              <LegendIcon name="lock" />
+              <LegendIcon name="junction" />
+              <LegendIcon name="winding" />
+            </span>
+            Locks, junctions &amp; winding holes
           </label>
           <label>
             <input
@@ -894,7 +954,7 @@ function App() {
               onChange={(event) => setShowBridges(event.target.checked)}
               type="checkbox"
             />
-            <span className="legend-bridge" />
+            <LegendIcon name="bridge" />
             Bridges ({graphCounts.bridges})
           </label>
           <label>
@@ -906,8 +966,17 @@ function App() {
             <span className="legend-boundary" />
             Region boundary
           </label>
+          <label>
+            <input
+              checked={showMarinas}
+              onChange={(event) => setShowMarinas(event.target.checked)}
+              type="checkbox"
+            />
+            <LegendIcon name="marina" />
+            Marinas ({marinaFeatures.length})
+          </label>
         </div>
-        <p className="map-help">Click a line or marker for its OSM details.</p>
+        <p className="map-help">Click a symbol or line for its details. Lock names and numbers come from Canal &amp; River Trust open data.</p>
       </section>
     </main>
   )

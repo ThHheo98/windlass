@@ -49,6 +49,7 @@ function buildQuery(polygon) {
   way(poly:"${polygon}")["bridge"~"^(yes|movable|viaduct|aqueduct|covered|boardwalk|low_water_crossing)$"];
   way(poly:"${polygon}")["man_made"="bridge"];
   nwr(poly:"${polygon}")["name"~"Packet Boat Marina|Pickett.?s Lock|Alfie.?s Lock",i];
+  nwr(poly:"${polygon}")["leisure"="marina"];
 );
 out body geom;`
 }
