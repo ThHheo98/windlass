@@ -9,7 +9,8 @@ import {
   type GeoJSONSource,
 } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
-import graphJson from '../data/graph/graph.json?raw'
+import graphJson from '../data/graph/graph.compact.json?raw'
+import { decodeGraph, type DecodedGraph } from '../scripts/graph-codec.mjs'
 import regionBoundary from '../data/region/london-mvp.geojson?raw'
 import {
   DEFAULT_SPEED_KMH,
@@ -78,47 +79,14 @@ function routeFeatures(route: Route | null) {
   }
 }
 
-type GraphNode = {
-  id: string | number
-  lon: number
-  lat: number
-  type: 'lock' | 'junction' | 'winding' | 'end' | 'join'
-  name?: string
-}
-
-type GraphEdge = {
-  id: string
-  a: string | number
-  b: string | number
-  lengthM: number
-  lock: boolean
-  lockName?: string
-  lockNumber?: string
-  waterwayName?: string
-  crtId?: string
-  name?: string
-  way: string | number
-  coords: [number, number][]
-  bridges: { atM: number; name?: string }[]
-}
-
-type GraphData = {
-  connected: boolean
-  componentCount: number
-  nodes: GraphNode[]
-  edges: GraphEdge[]
-  anchors: {
-    start: { feature: string; vertexId: string | number } | null
-    finish: { feature: string; vertexId: string | number } | null
-  }
-  marinas: { id: string; name: string; lon: number; lat: number }[]
-}
+type GraphData = DecodedGraph
+type GraphEdge = GraphData['edges'][number]
 
 type FeatureProperties = Record<string, string | number | boolean | null>
 
 setWorkerUrl(workerUrl)
 
-const graph = JSON.parse(graphJson) as GraphData
+const graph: GraphData = decodeGraph(JSON.parse(graphJson))
 const boundary = JSON.parse(regionBoundary)
 const earthRadiusM = 6_371_008.8
 const routeBounds: [[number, number], [number, number]] = graph.edges.reduce(
@@ -150,7 +118,14 @@ function distanceM(a: [number, number], b: [number, number]) {
   return 2 * earthRadiusM * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
 }
 
+// `atM` is measured on the surveyed edge length; the shipped line is simplified
+// and a little shorter, so scale the distance onto it.
 function pointAlongEdge(edge: GraphEdge, atM: number): [number, number] {
+  let lineM = 0
+  for (let index = 1; index < edge.coords.length; index += 1) {
+    lineM += distanceM(edge.coords[index - 1], edge.coords[index])
+  }
+  if (edge.lengthM > 0) atM *= lineM / edge.lengthM
   let distanceSoFar = 0
 
   for (let index = 1; index < edge.coords.length; index += 1) {
@@ -180,7 +155,6 @@ const edgeFeatures = graph.edges
       name: edge.lockName ?? edge.name ?? 'Unnamed waterway',
       lock: edge.lock,
       lengthM: edge.lengthM,
-      way: edge.way,
     },
     geometry: {
       type: 'LineString' as const,
@@ -259,12 +233,12 @@ function describeFeature(
     case 'graph-nodes':
       return {
         title: `${text('type') === 'winding' ? 'Winding hole' : 'Junction'}: ${text('name') || text('id')}`,
-        details: `OSM node ${text('id')}`,
+        details: `Graph node ${text('id')}`,
       }
     case 'graph-ends':
       return {
         title: `End of navigation: ${text('name') || text('id')}`,
-        details: `OSM node ${text('id')}`,
+        details: `Graph node ${text('id')}`,
       }
     case 'graph-bridges':
       return {
@@ -313,36 +287,24 @@ const bridgeFeatures = graph.edges.flatMap((edge) =>
   })),
 )
 
-const anchorFeatures = [
-  { ...graph.anchors.start, role: 'Start' },
-  { ...graph.anchors.finish, role: 'Finish' },
-]
-  .filter(
-    (
-      anchor,
-    ): anchor is {
-      feature: string
-      vertexId: string | number
-      role: string
-    } => anchor.feature !== null && anchor.vertexId !== null,
-  )
-  .flatMap((anchor) => {
-    const node = graph.nodes.find(
-      (candidate) => String(candidate.id) === String(anchor.vertexId),
-    )
-    return node
-      ? [
-          {
-            type: 'Feature' as const,
-            properties: { name: anchor.feature, role: anchor.role },
-            geometry: {
-              type: 'Point' as const,
-              coordinates: [node.lon, node.lat],
-            },
-          },
-        ]
-      : []
-  })
+const anchorFeatures = (
+  [
+    [graph.anchors.start, 'Start'],
+    [graph.anchors.finish, 'Finish'],
+  ] as const
+).flatMap(([anchor, role]) => {
+  // Node ids are their index in graph.nodes.
+  const node = anchor ? graph.nodes[anchor.vertexId] : undefined
+  return anchor && node
+    ? [
+        {
+          type: 'Feature' as const,
+          properties: { name: anchor.feature, role },
+          geometry: { type: 'Point' as const, coordinates: [node.lon, node.lat] },
+        },
+      ]
+    : []
+})
 
 const graphCounts = {
   nodes: graph.nodes.length,

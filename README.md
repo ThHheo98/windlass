@@ -60,6 +60,20 @@ CRT lock chamber on the route is missing from the graph. Bow Locks and
 Limehouse Ship Lock are listed as deliberately out of scope. Named OSM marinas
 within 150 m of the route are written to `graph.json` for the map.
 
+`graph` also writes `data/graph/graph.compact.json`, which is what the map
+loads (`graph.json` stays as the full output for inspection). It keeps only
+what routing and display need: node types and coordinates, edge lengths, lock
+flags and names, bridges, marinas and the two anchors. OSM ids and tags are
+dropped. Nodes and edges are flat integer arrays referred to by index,
+coordinates are rounded to 1e-5 degrees (about 1 m) and delta-encoded, lengths
+are stored in decimetres, and edge lines are simplified with Douglas–Peucker to
+2 m. The format is described in `scripts/graph-codec.mjs`. Travel times are not
+stored, because they depend on the lock pace and speed chosen in the planner;
+routing derives them from each edge's surveyed length and lock flag, so routes
+match the full graph. This cuts the shipped graph from 31.5 KB to 8.5 KB
+gzipped. A binary version was tried and saved under 1 KB more, so it was not
+adopted.
+
 It also reports the number of graph components; more than one means there are
 disconnected mapped sections to inspect. If the endpoint check fails, it reports
 missing anchors or the closest vertices across the gap.
